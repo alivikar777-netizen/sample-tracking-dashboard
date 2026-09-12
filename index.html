@@ -24,9 +24,7 @@
       const [samples, setSamples] = useState([]);
       const [loading, setLoading] = useState(true);
       const [searchTerm, setSearchTerm] = useState("");
-      const [selectedStatuses, setSelectedStatuses] = useState([]);
       const [selectedLocations, setSelectedLocations] = useState([]);
-      const [selectedIndustries, setSelectedIndustries] = useState([]);
       const [selectedSample, setSelectedSample] = useState(null);
       const [viewMode, setViewMode] = useState("grid");
 
@@ -34,12 +32,27 @@
         fetchSheetData();
       }, []);
 
-      // Extract URL strictly from row data
-      const getExactUrl = (cellValue) => {
-        if (!cellValue) return "";
-        const str = String(cellValue).trim();
+      // Helper function to extract value from row regardless of slight header spelling differences
+      const getColumnValue = (row, possibleNames) => {
+        const rowKeys = Object.keys(row);
+        for (let name of possibleNames) {
+          // Direct check
+          if (row[name] !== undefined && row[name] !== null && String(row[name]).trim() !== '') {
+            return String(row[name]).trim();
+          }
+          // Case insensitive check
+          const foundKey = rowKeys.find(k => k.trim().toLowerCase() === name.trim().toLowerCase());
+          if (foundKey && row[foundKey] !== undefined && row[foundKey] !== null && String(row[foundKey]).trim() !== '') {
+            return String(row[foundKey]).trim();
+          }
+        }
+        return '';
+      };
+
+      const extractUrl = (str) => {
+        if (!str) return '';
         const match = str.match(/https?:\/\/[^\s"']+/);
-        return match ? match[0] : (str.startsWith("http") ? str : "");
+        return match ? match[0] : (str.startsWith('http') ? str : '');
       };
 
       const fetchSheetData = () => {
@@ -54,26 +67,29 @@
           complete: (results) => {
             if (results.data && results.data.length > 0) {
               const formatted = results.data.map((row, idx) => {
-                // Fetch exact column matching Google Sheet headers shown in image
-                const rawSheetUrl = row['Sample Sheet'] || row['sampleSheet'] || row['Sheet Link'] || row['Link'] || '';
-                const validSheetUrl = getExactUrl(rawSheetUrl);
+                const sampleId = getColumnValue(row, ['Sample ID', 'SampleID', 'sample_id', 'ID']) || `SMP-${idx + 1}`;
+                const sampleName = getColumnValue(row, ['Sample Name', 'SampleName', 'sample_name', 'Name']) || `Sample ${idx + 1}`;
+                const rawSheetUrl = getColumnValue(row, ['Sample Sheet', 'SampleSheet', 'Sheet Link', 'Link', 'URL']);
+                const clientReq = getColumnValue(row, ['Client/Requirement', 'Client / Requirement', 'Client Requirement', 'Requirement', 'ClientReq']);
+                const tags = getColumnValue(row, ['Keywords / Tags', 'Keywords/Tags', 'Keywords', 'Tags', 'Tag']);
+                const location = getColumnValue(row, ['Location', 'Country']);
+                const project = getColumnValue(row, ['Project Yes/No', 'Project', 'Project Status']);
+                const difficulty = getColumnValue(row, ['Research Difficulty Index', 'Research Difficulty', 'Difficulty']);
+                const createdBy = getColumnValue(row, ['Sample Created By', 'Created By', 'Author']);
+                const industry = getColumnValue(row, ['Industry', 'Category']);
 
                 return {
                   id: idx.toString(),
-                  sampleId: row['Sample ID'] || row['sampleId'] || `SMP-${idx+1}`,
-                  project: row['Project Yes/No'] || row['project'] || 'Yes',
-                  date: row['Date'] || row['date'] || '',
-                  sampleName: row['Sample Name'] || row['sampleName'] || `Sample ${idx+1}`,
-                  sampleSheet: validSheetUrl,
-                  clientRequirement: row['Client/Requirement'] || row['Client Requirement'] || row['clientRequirement'] || '',
-                  researchDifficulty: row['Research Difficulty Index'] || row['researchDifficulty'] || '-',
-                  createdBy: row['Sample Created By'] || row['createdBy'] || '-',
-                  tags: row['Keywords / Tags'] || row['Keywords/Tags'] || row['tags'] || '-',
-                  industry: row['Industry'] || row['industry'] || '-',
-                  location: row['Location'] || row['location'] || '-',
-                  clientNote: row['Client Note'] || row['clientNote'] || '',
-                  salesNote: row['Sales Note'] || row['salesNote'] || '',
-                  status: (row['Project Yes/No'] === 'No' || row['Project Yes/No'] === 'N') ? 'Paused' : 'Completed'
+                  sampleId,
+                  sampleName,
+                  sampleSheet: extractUrl(rawSheetUrl),
+                  clientRequirement: clientReq || '-',
+                  tags: tags || '-',
+                  location: location || '-',
+                  project: project || 'Yes',
+                  researchDifficulty: difficulty || '-',
+                  createdBy: createdBy || '-',
+                  industry: industry || '-'
                 };
               });
               setSamples(formatted);
@@ -97,19 +113,16 @@
             (item.clientRequirement && item.clientRequirement.toLowerCase().includes(searchTerm.toLowerCase())) ||
             (item.tags && item.tags.toLowerCase().includes(searchTerm.toLowerCase()));
 
-          const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(item.status);
           const matchesLocation = selectedLocations.length === 0 || selectedLocations.includes(item.location);
-          const matchesIndustry = selectedIndustries.length === 0 || selectedIndustries.includes(item.industry);
 
-          return matchesSearch && matchesStatus && matchesLocation && matchesIndustry;
+          return matchesSearch && matchesLocation;
         });
-      }, [samples, searchTerm, selectedStatuses, selectedLocations, selectedIndustries]);
+      }, [samples, searchTerm, selectedLocations]);
 
-      const toggleFilter = (type, val) => {
-        const updateList = (prev) => prev.includes(val) ? prev.filter(x => x !== val) : [...prev, val];
-        if (type === 'status') setSelectedStatuses(updateList);
-        if (type === 'location') setSelectedLocations(updateList);
-        if (type === 'industry') setSelectedIndustries(updateList);
+      const toggleLocation = (loc) => {
+        setSelectedLocations(prev => 
+          prev.includes(loc) ? prev.filter(x => x !== loc) : [...prev, loc]
+        );
       };
 
       return (
@@ -154,7 +167,7 @@
                     <input
                       type="checkbox"
                       checked={selectedLocations.includes(loc)}
-                      onChange={() => toggleFilter('location', loc)}
+                      onChange={() => toggleLocation(loc)}
                       class="rounded text-blue-600"
                     />
                     <span>{loc}</span>
@@ -198,7 +211,7 @@
                         <div class="bg-slate-50 p-2 rounded-lg border border-slate-100 my-2">
                           <span class="text-[10px] font-bold text-slate-400 uppercase block">Client / Requirement:</span>
                           <p class="text-xs text-slate-700 line-clamp-2 font-medium">
-                            {sample.clientRequirement && sample.clientRequirement !== '-' ? sample.clientRequirement : 'No requirement details'}
+                            {sample.clientRequirement !== '-' ? sample.clientRequirement : 'No requirement details'}
                           </p>
                         </div>
 
@@ -285,12 +298,12 @@
                 <div class="space-y-3 text-sm">
                   <div>
                     <h4 class="font-bold text-slate-500 text-xs uppercase">Client / Requirement:</h4>
-                    <p class="text-slate-800 bg-slate-50 p-2.5 rounded-lg border border-slate-200 mt-1 font-medium">{selectedSample.clientRequirement || 'N/A'}</p>
+                    <p class="text-slate-800 bg-slate-50 p-2.5 rounded-lg border border-slate-200 mt-1 font-medium">{selectedSample.clientRequirement}</p>
                   </div>
 
                   <div>
                     <h4 class="font-bold text-slate-500 text-xs uppercase">Keywords / Tags:</h4>
-                    <p class="text-slate-800 bg-slate-50 p-2.5 rounded-lg border border-slate-200 mt-1 font-medium">{selectedSample.tags || 'N/A'}</p>
+                    <p class="text-slate-800 bg-slate-50 p-2.5 rounded-lg border border-slate-200 mt-1 font-medium">{selectedSample.tags}</p>
                   </div>
 
                   <div class="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
