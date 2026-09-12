@@ -11,7 +11,7 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <!-- Babel -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <!-- PapaParse for Google Sheet CSV Import -->
+  <!-- PapaParse for CSV -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 </head>
 <body class="bg-slate-100 text-slate-800 antialiased font-sans">
@@ -20,19 +20,11 @@
   <script type="text/babel">
     const { useState, useEffect, useMemo } = React;
 
-    // Direct Published CSV Feed of your Google Sheet
-    const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT3o6dO8x2-K-0m5gP28Q/pub?output=csv"; 
-
-    const FALLBACK_DATA = [
-      { id: "1", sampleId: "SMP-001", project: "Yes", date: "2024-03-01", sampleName: "Sample 0001", sampleSheet: "https://docs.google.com/spreadsheets/d/137QAuenLEQXOcea2PmojxQWEbou7pKr1FunNjXxjud0/edit", clientRequirement: "High Priority Tech Research", researchDifficulty: "High", createdBy: "Admin", tags: "USA", industry: "Education & Training", location: "USA", clientNote: "Requires full analysis", salesNote: "Demo scheduled", status: "Completed" },
-      { id: "2", sampleId: "SMP-002", project: "Yes", date: "2024-03-02", sampleName: "Sample 0012", sampleSheet: "https://docs.google.com/spreadsheets/d/137QAuenLEQXOcea2PmojxQWEbou7pKr1FunNjXxjud0/edit", clientRequirement: "Market Expansion", researchDifficulty: "Medium", createdBy: "John", tags: "In Progress", industry: "Education & Training", location: "Palm Springs", clientNote: "Awaiting approval", salesNote: "Follow up next week", status: "In Progress" },
-      { id: "3", sampleId: "SMP-003", project: "No", date: "2024-03-03", sampleName: "Sample 0021", sampleSheet: "https://docs.google.com/spreadsheets/d/137QAuenLEQXOcea2PmojxQWEbou7pKr1FunNjXxjud0/edit", clientRequirement: "Regional Survey", researchDifficulty: "Low", createdBy: "Sarah", tags: "Near Me", industry: "India", location: "USA", clientNote: "Standard sample", salesNote: "Closed deal", status: "Completed" },
-      { id: "4", sampleId: "SMP-004", project: "Yes", date: "2024-03-04", sampleName: "Sample 0022", sampleSheet: "", clientRequirement: "Local Business Analysis", researchDifficulty: "Low", createdBy: "Admin", tags: "USA, Paused", industry: "Education & Training", location: "Pomona", clientNote: "On hold by client", salesNote: "Paused contract", status: "Paused" }
-    ];
+    const DEFAULT_SHEET_LINK = "https://docs.google.com/spreadsheets/d/137QAuenLEQXOcea2PmojxQWEbou7pKr1FunNjXxjud0/edit";
 
     function App() {
-      const [samples, setSamples] = useState(FALLBACK_DATA);
-      const [loading, setLoading] = useState(false);
+      const [samples, setSamples] = useState([]);
+      const [loading, setLoading] = useState(true);
       const [searchTerm, setSearchTerm] = useState("");
       const [selectedStatuses, setSelectedStatuses] = useState([]);
       const [selectedLocations, setSelectedLocations] = useState([]);
@@ -41,21 +33,31 @@
       const [viewMode, setViewMode] = useState("grid");
       const [showAddModal, setShowAddModal] = useState(false);
 
-      // New Sample Form State
       const [newSample, setNewSample] = useState({
         sampleId: "", project: "Yes", date: new Date().toISOString().split('T')[0], sampleName: "",
-        sampleSheet: "", clientRequirement: "", researchDifficulty: "Medium", createdBy: "",
+        sampleSheet: DEFAULT_SHEET_LINK, clientRequirement: "", researchDifficulty: "Medium", createdBy: "",
         tags: "", industry: "Education & Training", location: "USA", clientNote: "", salesNote: "", status: "Completed"
       });
 
       useEffect(() => {
-        // Auto Sync with Google Sheet
         fetchSheetData();
       }, []);
 
+      const extractUrl = (cellValue) => {
+        if (!cellValue) return DEFAULT_SHEET_LINK;
+        const str = String(cellValue).trim();
+        if (str.startsWith("http://") || str.startsWith("https://")) {
+          return str;
+        }
+        // If string contains a link format inside quotes or text
+        const match = str.match(/https?:\/\/[^\s"']+/);
+        if (match) return match[0];
+        
+        return DEFAULT_SHEET_LINK;
+      };
+
       const fetchSheetData = () => {
         setLoading(true);
-        // Direct read from user sheet via Google Visualization API CSV
         const sheetId = "137QAuenLEQXOcea2PmojxQWEbou7pKr1FunNjXxjud0";
         const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`;
 
@@ -65,29 +67,34 @@
           skipEmptyLines: true,
           complete: (results) => {
             if (results.data && results.data.length > 0) {
-              const formatted = results.data.map((row, idx) => ({
-                id: idx.toString(),
-                sampleId: row['Sample ID'] || row['sampleId'] || `SMP-${idx+1}`,
-                project: row['Project Yes/No'] || row['project'] || 'Yes',
-                date: row['Date'] || row['date'] || '',
-                sampleName: row['Sample Name'] || row['sampleName'] || `Sample ${idx+1}`,
-                sampleSheet: row['Sample Sheet'] || row['sampleSheet'] || '',
-                clientRequirement: row['Client/Requirement'] || row['clientRequirement'] || '',
-                researchDifficulty: row['Research Difficulty Index'] || row['researchDifficulty'] || 'Medium',
-                createdBy: row['Sample Created By'] || row['createdBy'] || '',
-                tags: row['Keywords / Tags'] || row['tags'] || '',
-                industry: row['Industry'] || row['industry'] || 'General',
-                location: row['Location'] || row['location'] || 'USA',
-                clientNote: row['Client Note'] || row['clientNote'] || '',
-                salesNote: row['Sales Note'] || row['salesNote'] || '',
-                status: row['Project Yes/No'] === 'No' ? 'Paused' : 'Completed'
-              }));
+              const formatted = results.data.map((row, idx) => {
+                const rawSheetUrl = row['Sample Sheet'] || row['sampleSheet'] || row['Sheet Link'] || row['Link'];
+                const validSheetUrl = extractUrl(rawSheetUrl);
+
+                return {
+                  id: idx.toString(),
+                  sampleId: row['Sample ID'] || row['sampleId'] || `SMP-${idx+1}`,
+                  project: row['Project Yes/No'] || row['project'] || 'Yes',
+                  date: row['Date'] || row['date'] || '',
+                  sampleName: row['Sample Name'] || row['sampleName'] || `Sample ${idx+1}`,
+                  sampleSheet: validSheetUrl,
+                  clientRequirement: row['Client/Requirement'] || row['clientRequirement'] || '',
+                  researchDifficulty: row['Research Difficulty Index'] || row['researchDifficulty'] || 'Medium',
+                  createdBy: row['Sample Created By'] || row['createdBy'] || '',
+                  tags: row['Keywords / Tags'] || row['tags'] || 'General',
+                  industry: row['Industry'] || row['industry'] || 'General',
+                  location: row['Location'] || row['location'] || 'USA',
+                  clientNote: row['Client Note'] || row['clientNote'] || '',
+                  salesNote: row['Sales Note'] || row['salesNote'] || '',
+                  status: (row['Project Yes/No'] === 'No' || row['Project Yes/No'] === 'N') ? 'Paused' : 'Completed'
+                };
+              });
               setSamples(formatted);
             }
             setLoading(false);
           },
           error: (err) => {
-            console.log("Using Fallback Data:", err);
+            console.error("CSV Fetch Error:", err);
             setLoading(false);
           }
         });
@@ -115,11 +122,6 @@
         const created = { ...newSample, id: Date.now().toString() };
         setSamples([created, ...samples]);
         setShowAddModal(false);
-        setNewSample({
-          sampleId: "", project: "Yes", date: new Date().toISOString().split('T')[0], sampleName: "",
-          sampleSheet: "", clientRequirement: "", researchDifficulty: "Medium", createdBy: "",
-          tags: "", industry: "Education & Training", location: "USA", clientNote: "", salesNote: "", status: "Completed"
-        });
       };
 
       const toggleFilter = (type, val) => {
@@ -137,7 +139,7 @@
               <div class="p-2 bg-blue-600 text-white rounded-lg font-bold text-lg">ST</div>
               <div>
                 <h1 class="text-xl font-bold text-slate-800 leading-none">Sample Tracking Dashboard</h1>
-                <p class="text-xs text-slate-500 mt-0.5">Google Sheet Connected Database</p>
+                <p class="text-xs text-slate-500 mt-0.5">Live Google Sheet Database</p>
               </div>
             </div>
 
@@ -216,10 +218,14 @@
             {/* Main Content */}
             <main class="flex-1 p-6">
               <div class="mb-4 flex justify-between items-center">
-                <p class="text-sm text-slate-600">Showing <span class="font-bold text-slate-900">{filteredSamples.length}</span> samples from Google Sheet</p>
+                <p class="text-sm text-slate-600">Total <span class="font-bold text-slate-900">{filteredSamples.length}</span> sample records loaded</p>
               </div>
 
-              {viewMode === 'grid' ? (
+              {loading ? (
+                <div class="flex justify-center items-center py-20 text-slate-500 font-medium">
+                  ⏳ Loading database from Google Sheet...
+                </div>
+              ) : viewMode === 'grid' ? (
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {filteredSamples.map(sample => (
                     <div 
@@ -231,8 +237,7 @@
                         <div class="flex justify-between items-start mb-2">
                           <h2 class="font-bold text-base text-slate-800">{sample.sampleName}</h2>
                           <span class={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                            sample.status === 'Completed' ? 'bg-emerald-100 text-emerald-800' :
-                            sample.status === 'In Progress' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
+                            sample.project === 'Yes' || sample.project === 'Y' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
                           }`}>
                             {sample.project === 'Yes' || sample.project === 'Y' ? 'Project Y' : 'Project N'}
                           </span>
@@ -242,23 +247,24 @@
                           <p><span class="font-semibold text-slate-800">Sample ID:</span> {sample.sampleId}</p>
                           <p><span class="font-semibold text-slate-800">Location:</span> {sample.location || 'N/A'}</p>
                           <p><span class="font-semibold text-slate-800">Industry:</span> {sample.industry || 'N/A'}</p>
-                          {sample.researchDifficulty && (
-                            <p><span class="font-semibold text-slate-800">Difficulty:</span> {sample.researchDifficulty}</p>
-                          )}
+                          <p><span class="font-semibold text-slate-800">Difficulty:</span> {sample.researchDifficulty || 'N/A'}</p>
                         </div>
                       </div>
 
                       <div class="pt-3 border-t border-slate-100 flex justify-between items-center">
-                        <span class="inline-block bg-slate-100 text-slate-700 text-xs px-2 py-0.5 rounded font-medium truncate max-w-[150px]">
-                          🏷️ {sample.tags || 'No Tags'}
+                        <span class="inline-block bg-slate-100 text-slate-700 text-xs px-2 py-0.5 rounded font-medium truncate max-w-[130px]">
+                          🏷️ {sample.tags || 'General'}
                         </span>
-                        {sample.sampleSheet ? (
-                          <a href={sample.sampleSheet} target="_blank" onClick={(e) => e.stopPropagation()} class="text-blue-600 text-xs font-bold hover:underline flex items-center gap-0.5">
-                            Sheet ↗
-                          </a>
-                        ) : (
-                          <span class="text-xs text-slate-400">No Link</span>
-                        )}
+                        
+                        <a 
+                          href={sample.sampleSheet} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()} 
+                          class="px-2.5 py-1 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded text-xs font-bold transition flex items-center gap-1 border border-blue-200"
+                        >
+                          🔗 View Sheet
+                        </a>
                       </div>
                     </div>
                   ))}
@@ -275,7 +281,7 @@
                         <th class="p-3">Industry</th>
                         <th class="p-3">Difficulty</th>
                         <th class="p-3">Keywords / Tags</th>
-                        <th class="p-3">Sample Sheet</th>
+                        <th class="p-3">Sample Sheet URL</th>
                       </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
@@ -293,9 +299,15 @@
                           <td class="p-3">{sample.researchDifficulty}</td>
                           <td class="p-3 text-xs">{sample.tags}</td>
                           <td class="p-3">
-                            {sample.sampleSheet && (
-                              <a href={sample.sampleSheet} target="_blank" onClick={(e) => e.stopPropagation()} class="text-blue-600 underline font-medium">Open Sheet</a>
-                            )}
+                            <a 
+                              href={sample.sampleSheet} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()} 
+                              class="text-blue-600 hover:underline font-bold text-xs bg-blue-50 px-2 py-1 rounded border border-blue-200"
+                            >
+                              🔗 Open URL
+                            </a>
                           </td>
                         </tr>
                       ))}
@@ -339,11 +351,9 @@
                 </div>
 
                 <div class="mt-6 flex justify-between items-center">
-                  {selectedSample.sampleSheet ? (
-                    <a href={selectedSample.sampleSheet} target="_blank" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg text-sm hover:bg-blue-700">
-                      Open Sample Sheet Link ↗
-                    </a>
-                  ) : <span class="text-xs text-slate-400">No sheet link attached</span>}
+                  <a href={selectedSample.sampleSheet} target="_blank" rel="noopener noreferrer" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg text-sm hover:bg-blue-700 shadow">
+                    🔗 Open Sample Sheet Link ↗
+                  </a>
                   <button onClick={() => setSelectedSample(null)} class="px-4 py-2 bg-slate-200 text-slate-700 font-semibold rounded-lg text-sm">Close</button>
                 </div>
               </div>
@@ -382,7 +392,7 @@
 
                   <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">Sample Sheet URL</label>
-                    <input type="url" value={newSample.sampleSheet} onChange={e => setNewSample({...newSample, sampleSheet: e.target.value})} class="w-full p-2 border rounded" placeholder="https://docs.google.com/sheets/..." />
+                    <input type="url" value={newSample.sampleSheet} onChange={e => setNewSample({...newSample, sampleSheet: e.target.value})} class="w-full p-2 border rounded" placeholder="https://docs.google.com/spreadsheets/..." />
                   </div>
 
                   <div>
