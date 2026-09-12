@@ -20,8 +20,6 @@
   <script type="text/babel">
     const { useState, useEffect, useMemo } = React;
 
-    const DEFAULT_SHEET_LINK = "https://docs.google.com/spreadsheets/d/137QAuenLEQXOcea2PmojxQWEbou7pKr1FunNjXxjud0/edit";
-
     function App() {
       const [samples, setSamples] = useState([]);
       const [loading, setLoading] = useState(true);
@@ -31,29 +29,17 @@
       const [selectedIndustries, setSelectedIndustries] = useState([]);
       const [selectedSample, setSelectedSample] = useState(null);
       const [viewMode, setViewMode] = useState("grid");
-      const [showAddModal, setShowAddModal] = useState(false);
-
-      const [newSample, setNewSample] = useState({
-        sampleId: "", project: "Yes", date: new Date().toISOString().split('T')[0], sampleName: "",
-        sampleSheet: DEFAULT_SHEET_LINK, clientRequirement: "", researchDifficulty: "Medium", createdBy: "",
-        tags: "", industry: "Education & Training", location: "USA", clientNote: "", salesNote: "", status: "Completed"
-      });
 
       useEffect(() => {
         fetchSheetData();
       }, []);
 
-      const extractUrl = (cellValue) => {
-        if (!cellValue) return DEFAULT_SHEET_LINK;
+      // Extract URL strictly from row data
+      const getExactUrl = (cellValue) => {
+        if (!cellValue) return "";
         const str = String(cellValue).trim();
-        if (str.startsWith("http://") || str.startsWith("https://")) {
-          return str;
-        }
-        // If string contains a link format inside quotes or text
         const match = str.match(/https?:\/\/[^\s"']+/);
-        if (match) return match[0];
-        
-        return DEFAULT_SHEET_LINK;
+        return match ? match[0] : (str.startsWith("http") ? str : "");
       };
 
       const fetchSheetData = () => {
@@ -68,8 +54,9 @@
           complete: (results) => {
             if (results.data && results.data.length > 0) {
               const formatted = results.data.map((row, idx) => {
-                const rawSheetUrl = row['Sample Sheet'] || row['sampleSheet'] || row['Sheet Link'] || row['Link'];
-                const validSheetUrl = extractUrl(rawSheetUrl);
+                // Fetch exact column matching Google Sheet headers shown in image
+                const rawSheetUrl = row['Sample Sheet'] || row['sampleSheet'] || row['Sheet Link'] || row['Link'] || '';
+                const validSheetUrl = getExactUrl(rawSheetUrl);
 
                 return {
                   id: idx.toString(),
@@ -78,12 +65,12 @@
                   date: row['Date'] || row['date'] || '',
                   sampleName: row['Sample Name'] || row['sampleName'] || `Sample ${idx+1}`,
                   sampleSheet: validSheetUrl,
-                  clientRequirement: row['Client/Requirement'] || row['clientRequirement'] || '',
-                  researchDifficulty: row['Research Difficulty Index'] || row['researchDifficulty'] || 'Medium',
-                  createdBy: row['Sample Created By'] || row['createdBy'] || '',
-                  tags: row['Keywords / Tags'] || row['tags'] || 'General',
-                  industry: row['Industry'] || row['industry'] || 'General',
-                  location: row['Location'] || row['location'] || 'USA',
+                  clientRequirement: row['Client/Requirement'] || row['Client Requirement'] || row['clientRequirement'] || '',
+                  researchDifficulty: row['Research Difficulty Index'] || row['researchDifficulty'] || '-',
+                  createdBy: row['Sample Created By'] || row['createdBy'] || '-',
+                  tags: row['Keywords / Tags'] || row['Keywords/Tags'] || row['tags'] || '-',
+                  industry: row['Industry'] || row['industry'] || '-',
+                  location: row['Location'] || row['location'] || '-',
                   clientNote: row['Client Note'] || row['clientNote'] || '',
                   salesNote: row['Sales Note'] || row['salesNote'] || '',
                   status: (row['Project Yes/No'] === 'No' || row['Project Yes/No'] === 'N') ? 'Paused' : 'Completed'
@@ -107,6 +94,7 @@
             (item.sampleId && item.sampleId.toLowerCase().includes(searchTerm.toLowerCase())) ||
             (item.location && item.location.toLowerCase().includes(searchTerm.toLowerCase())) ||
             (item.industry && item.industry.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (item.clientRequirement && item.clientRequirement.toLowerCase().includes(searchTerm.toLowerCase())) ||
             (item.tags && item.tags.toLowerCase().includes(searchTerm.toLowerCase()));
 
           const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(item.status);
@@ -116,13 +104,6 @@
           return matchesSearch && matchesStatus && matchesLocation && matchesIndustry;
         });
       }, [samples, searchTerm, selectedStatuses, selectedLocations, selectedIndustries]);
-
-      const handleAddSample = (e) => {
-        e.preventDefault();
-        const created = { ...newSample, id: Date.now().toString() };
-        setSamples([created, ...samples]);
-        setShowAddModal(false);
-      };
 
       const toggleFilter = (type, val) => {
         const updateList = (prev) => prev.includes(val) ? prev.filter(x => x !== val) : [...prev, val];
@@ -146,7 +127,7 @@
             <div class="flex-1 max-w-xl mx-6">
               <input
                 type="text"
-                placeholder="🔍 Search Sample ID, Name, Location, Keywords/Tags..."
+                placeholder="🔍 Search Sample ID, Name, Requirement, Tags, Location..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 class="w-full px-4 py-2 bg-slate-100 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -160,9 +141,6 @@
               <button onClick={() => setViewMode(viewMode === 'grid' ? 'table' : 'grid')} class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg text-sm border border-slate-300">
                 {viewMode === 'grid' ? '📊 Table View' : '🎴 Grid View'}
               </button>
-              <button onClick={() => setShowAddModal(true)} class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-sm shadow">
-                + Add Sample
-              </button>
             </div>
           </header>
 
@@ -170,23 +148,8 @@
             {/* Sidebar Filters */}
             <aside class="w-64 bg-white border-r border-slate-200 p-4 shrink-0 hidden md:block">
               <div class="mb-6">
-                <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Project Status</h3>
-                {['Completed', 'In Progress', 'Paused'].map(st => (
-                  <label key={st} class="flex items-center space-x-2 py-1 text-sm text-slate-700 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={selectedStatuses.includes(st)}
-                      onChange={() => toggleFilter('status', st)}
-                      class="rounded text-blue-600"
-                    />
-                    <span>{st}</span>
-                  </label>
-                ))}
-              </div>
-
-              <div class="mb-6">
                 <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Location</h3>
-                {['USA', 'UK', 'Germany', 'Near Me', 'Palm Springs', 'Pomona'].map(loc => (
+                {['United States', 'New Zealand', 'Australia', 'United Kingdom', 'United Arab Emirates', 'Brazil'].map(loc => (
                   <label key={loc} class="flex items-center space-x-2 py-1 text-sm text-slate-700 cursor-pointer">
                     <input
                       type="checkbox"
@@ -195,21 +158,6 @@
                       class="rounded text-blue-600"
                     />
                     <span>{loc}</span>
-                  </label>
-                ))}
-              </div>
-
-              <div>
-                <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Industry</h3>
-                {['Education & Training', 'Medical & Pharma', 'B2B Services', 'India'].map(ind => (
-                  <label key={ind} class="flex items-center space-x-2 py-1 text-sm text-slate-700 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={selectedIndustries.includes(ind)}
-                      onChange={() => toggleFilter('industry', ind)}
-                      class="rounded text-blue-600"
-                    />
-                    <span>{ind}</span>
                   </label>
                 ))}
               </div>
@@ -235,36 +183,48 @@
                     >
                       <div>
                         <div class="flex justify-between items-start mb-2">
-                          <h2 class="font-bold text-base text-slate-800">{sample.sampleName}</h2>
-                          <span class={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                            sample.project === 'Yes' || sample.project === 'Y' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-                          }`}>
-                            {sample.project === 'Yes' || sample.project === 'Y' ? 'Project Y' : 'Project N'}
-                          </span>
+                          <div>
+                            <span class="text-[10px] font-bold text-blue-600 uppercase tracking-wide block">{sample.sampleId}</span>
+                            <h2 class="font-bold text-base text-slate-800 leading-snug">{sample.sampleName}</h2>
+                          </div>
+                          {sample.location && sample.location !== '-' && (
+                            <span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[11px] font-medium shrink-0 ml-2">
+                              📍 {sample.location}
+                            </span>
+                          )}
                         </div>
                         
-                        <div class="text-xs text-slate-600 space-y-1 mb-3">
-                          <p><span class="font-semibold text-slate-800">Sample ID:</span> {sample.sampleId}</p>
-                          <p><span class="font-semibold text-slate-800">Location:</span> {sample.location || 'N/A'}</p>
-                          <p><span class="font-semibold text-slate-800">Industry:</span> {sample.industry || 'N/A'}</p>
-                          <p><span class="font-semibold text-slate-800">Difficulty:</span> {sample.researchDifficulty || 'N/A'}</p>
+                        {/* Requirement Box */}
+                        <div class="bg-slate-50 p-2 rounded-lg border border-slate-100 my-2">
+                          <span class="text-[10px] font-bold text-slate-400 uppercase block">Client / Requirement:</span>
+                          <p class="text-xs text-slate-700 line-clamp-2 font-medium">
+                            {sample.clientRequirement && sample.clientRequirement !== '-' ? sample.clientRequirement : 'No requirement details'}
+                          </p>
+                        </div>
+
+                        {/* Keywords / Tags */}
+                        <div class="mt-2">
+                          <span class="text-[10px] font-bold text-slate-400 uppercase block mb-0.5">Keywords / Tags:</span>
+                          <span class="inline-block bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded font-medium border border-blue-100">
+                            🏷️ {sample.tags}
+                          </span>
                         </div>
                       </div>
 
-                      <div class="pt-3 border-t border-slate-100 flex justify-between items-center">
-                        <span class="inline-block bg-slate-100 text-slate-700 text-xs px-2 py-0.5 rounded font-medium truncate max-w-[130px]">
-                          🏷️ {sample.tags || 'General'}
-                        </span>
-                        
-                        <a 
-                          href={sample.sampleSheet} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()} 
-                          class="px-2.5 py-1 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded text-xs font-bold transition flex items-center gap-1 border border-blue-200"
-                        >
-                          🔗 View Sheet
-                        </a>
+                      <div class="pt-3 mt-3 border-t border-slate-100 flex justify-end items-center">
+                        {sample.sampleSheet ? (
+                          <a 
+                            href={sample.sampleSheet} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()} 
+                            class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-sm"
+                          >
+                            🔗 Open Sample Sheet ↗
+                          </a>
+                        ) : (
+                          <span class="text-xs text-slate-400 italic">No Sheet Link</span>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -276,12 +236,10 @@
                       <tr>
                         <th class="p-3">Sample ID</th>
                         <th class="p-3">Sample Name</th>
-                        <th class="p-3">Project</th>
-                        <th class="p-3">Location</th>
-                        <th class="p-3">Industry</th>
-                        <th class="p-3">Difficulty</th>
+                        <th class="p-3">Client / Requirement</th>
                         <th class="p-3">Keywords / Tags</th>
-                        <th class="p-3">Sample Sheet URL</th>
+                        <th class="p-3">Location</th>
+                        <th class="p-3">Sample Sheet</th>
                       </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
@@ -289,25 +247,23 @@
                         <tr key={sample.id} onClick={() => setSelectedSample(sample)} class="hover:bg-blue-50/50 cursor-pointer">
                           <td class="p-3 font-bold text-slate-900">{sample.sampleId}</td>
                           <td class="p-3 font-medium text-slate-800">{sample.sampleName}</td>
-                          <td class="p-3">
-                            <span class={`px-2 py-0.5 rounded-full text-xs font-bold ${sample.project === 'Yes' || sample.project === 'Y' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'}`}>
-                              {sample.project}
-                            </span>
-                          </td>
-                          <td class="p-3">{sample.location}</td>
-                          <td class="p-3">{sample.industry}</td>
-                          <td class="p-3">{sample.researchDifficulty}</td>
+                          <td class="p-3 text-slate-600 max-w-xs truncate">{sample.clientRequirement}</td>
                           <td class="p-3 text-xs">{sample.tags}</td>
+                          <td class="p-3">{sample.location}</td>
                           <td class="p-3">
-                            <a 
-                              href={sample.sampleSheet} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()} 
-                              class="text-blue-600 hover:underline font-bold text-xs bg-blue-50 px-2 py-1 rounded border border-blue-200"
-                            >
-                              🔗 Open URL
-                            </a>
+                            {sample.sampleSheet ? (
+                              <a 
+                                href={sample.sampleSheet} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()} 
+                                class="text-blue-600 hover:underline font-bold text-xs bg-blue-50 px-2 py-1 rounded border border-blue-200"
+                              >
+                                🔗 Open URL ↗
+                              </a>
+                            ) : (
+                              <span class="text-slate-400 text-xs">-</span>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -323,88 +279,38 @@
             <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
               <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative border border-slate-100">
                 <button onClick={() => setSelectedSample(null)} class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 font-bold text-lg">✕</button>
-                <h2 class="text-xl font-bold text-slate-900 mb-1">{selectedSample.sampleName}</h2>
-                <p class="text-xs text-slate-500 mb-4">Sample ID: <span class="font-bold text-slate-800">{selectedSample.sampleId}</span></p>
-
-                <div class="grid grid-cols-2 gap-3 text-sm bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4">
-                  <div><span class="text-slate-500 text-xs block">Project Yes/No</span><span class="font-bold text-slate-800">{selectedSample.project}</span></div>
-                  <div><span class="text-slate-500 text-xs block">Date</span><span class="font-bold text-slate-800">{selectedSample.date || 'N/A'}</span></div>
-                  <div><span class="text-slate-500 text-xs block">Location</span><span class="font-bold text-slate-800">{selectedSample.location || 'N/A'}</span></div>
-                  <div><span class="text-slate-500 text-xs block">Industry</span><span class="font-bold text-slate-800">{selectedSample.industry || 'N/A'}</span></div>
-                  <div><span class="text-slate-500 text-xs block">Research Difficulty</span><span class="font-bold text-slate-800">{selectedSample.researchDifficulty || 'N/A'}</span></div>
-                  <div><span class="text-slate-500 text-xs block">Created By</span><span class="font-bold text-slate-800">{selectedSample.createdBy || 'N/A'}</span></div>
-                </div>
+                <span class="text-xs font-bold text-blue-600 uppercase">{selectedSample.sampleId}</span>
+                <h2 class="text-xl font-bold text-slate-900 mb-4">{selectedSample.sampleName}</h2>
 
                 <div class="space-y-3 text-sm">
                   <div>
-                    <h4 class="font-semibold text-slate-800 text-xs uppercase">Client / Requirement:</h4>
-                    <p class="text-slate-600 bg-slate-50 p-2 rounded border border-slate-200 mt-1">{selectedSample.clientRequirement || 'None'}</p>
+                    <h4 class="font-bold text-slate-500 text-xs uppercase">Client / Requirement:</h4>
+                    <p class="text-slate-800 bg-slate-50 p-2.5 rounded-lg border border-slate-200 mt-1 font-medium">{selectedSample.clientRequirement || 'N/A'}</p>
                   </div>
+
                   <div>
-                    <h4 class="font-semibold text-slate-800 text-xs uppercase">Client Note:</h4>
-                    <p class="text-slate-600 bg-slate-50 p-2 rounded border border-slate-200 mt-1">{selectedSample.clientNote || 'None'}</p>
+                    <h4 class="font-bold text-slate-500 text-xs uppercase">Keywords / Tags:</h4>
+                    <p class="text-slate-800 bg-slate-50 p-2.5 rounded-lg border border-slate-200 mt-1 font-medium">{selectedSample.tags || 'N/A'}</p>
                   </div>
-                  <div>
-                    <h4 class="font-semibold text-slate-800 text-xs uppercase">Sales Note:</h4>
-                    <p class="text-slate-600 bg-slate-50 p-2 rounded border border-slate-200 mt-1">{selectedSample.salesNote || 'None'}</p>
+
+                  <div class="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                    <div><span class="text-slate-400 text-xs block">Location:</span><span class="font-semibold text-slate-700">{selectedSample.location}</span></div>
+                    <div><span class="text-slate-400 text-xs block">Industry:</span><span class="font-semibold text-slate-700">{selectedSample.industry}</span></div>
+                    <div><span class="text-slate-400 text-xs block">Difficulty Index:</span><span class="font-semibold text-slate-700">{selectedSample.researchDifficulty}</span></div>
+                    <div><span class="text-slate-400 text-xs block">Created By:</span><span class="font-semibold text-slate-700">{selectedSample.createdBy}</span></div>
                   </div>
                 </div>
 
                 <div class="mt-6 flex justify-between items-center">
-                  <a href={selectedSample.sampleSheet} target="_blank" rel="noopener noreferrer" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg text-sm hover:bg-blue-700 shadow">
-                    🔗 Open Sample Sheet Link ↗
-                  </a>
+                  {selectedSample.sampleSheet ? (
+                    <a href={selectedSample.sampleSheet} target="_blank" rel="noopener noreferrer" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg text-sm hover:bg-blue-700 shadow">
+                      🔗 Open Sample Sheet ↗
+                    </a>
+                  ) : (
+                    <span class="text-sm text-slate-400 italic">No Sheet Link Available</span>
+                  )}
                   <button onClick={() => setSelectedSample(null)} class="px-4 py-2 bg-slate-200 text-slate-700 font-semibold rounded-lg text-sm">Close</button>
                 </div>
-              </div>
-            </div>
-          )}
-
-          {/* Add Sample Modal */}
-          {showAddModal && (
-            <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-              <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
-                <button onClick={() => setShowAddModal(false)} class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 font-bold">✕</button>
-                <h2 class="text-xl font-bold text-slate-900 mb-4">Add New Sample Entry</h2>
-
-                <form onSubmit={handleAddSample} class="space-y-3 text-sm">
-                  <div class="grid grid-cols-2 gap-3">
-                    <div>
-                      <label class="block text-xs font-semibold text-slate-600 mb-1">Sample ID</label>
-                      <input type="text" required value={newSample.sampleId} onChange={e => setNewSample({...newSample, sampleId: e.target.value})} class="w-full p-2 border rounded" placeholder="SMP-0099" />
-                    </div>
-                    <div>
-                      <label class="block text-xs font-semibold text-slate-600 mb-1">Sample Name</label>
-                      <input type="text" required value={newSample.sampleName} onChange={e => setNewSample({...newSample, sampleName: e.target.value})} class="w-full p-2 border rounded" placeholder="Sample 0099" />
-                    </div>
-                  </div>
-
-                  <div class="grid grid-cols-2 gap-3">
-                    <div>
-                      <label class="block text-xs font-semibold text-slate-600 mb-1">Location</label>
-                      <input type="text" value={newSample.location} onChange={e => setNewSample({...newSample, location: e.target.value})} class="w-full p-2 border rounded" />
-                    </div>
-                    <div>
-                      <label class="block text-xs font-semibold text-slate-600 mb-1">Industry</label>
-                      <input type="text" value={newSample.industry} onChange={e => setNewSample({...newSample, industry: e.target.value})} class="w-full p-2 border rounded" />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Sample Sheet URL</label>
-                    <input type="url" value={newSample.sampleSheet} onChange={e => setNewSample({...newSample, sampleSheet: e.target.value})} class="w-full p-2 border rounded" placeholder="https://docs.google.com/spreadsheets/..." />
-                  </div>
-
-                  <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Keywords / Tags</label>
-                    <input type="text" value={newSample.tags} onChange={e => setNewSample({...newSample, tags: e.target.value})} class="w-full p-2 border rounded" placeholder="USA, Education" />
-                  </div>
-
-                  <div class="flex justify-end space-x-3 pt-3">
-                    <button type="button" onClick={() => setShowAddModal(false)} class="px-4 py-2 border rounded text-slate-600">Cancel</button>
-                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded hover:bg-blue-700">Save Sample</button>
-                  </div>
-                </form>
               </div>
             </div>
           )}
