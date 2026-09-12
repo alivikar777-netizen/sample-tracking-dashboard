@@ -32,27 +32,10 @@
         fetchSheetData();
       }, []);
 
-      // Helper function to extract value from row regardless of slight header spelling differences
-      const getColumnValue = (row, possibleNames) => {
-        const rowKeys = Object.keys(row);
-        for (let name of possibleNames) {
-          // Direct check
-          if (row[name] !== undefined && row[name] !== null && String(row[name]).trim() !== '') {
-            return String(row[name]).trim();
-          }
-          // Case insensitive check
-          const foundKey = rowKeys.find(k => k.trim().toLowerCase() === name.trim().toLowerCase());
-          if (foundKey && row[foundKey] !== undefined && row[foundKey] !== null && String(row[foundKey]).trim() !== '') {
-            return String(row[foundKey]).trim();
-          }
-        }
-        return '';
-      };
-
       const extractUrl = (str) => {
         if (!str) return '';
-        const match = str.match(/https?:\/\/[^\s"']+/);
-        return match ? match[0] : (str.startsWith('http') ? str : '');
+        const match = String(str).match(/https?:\/\/[^\s"']+/);
+        return match ? match[0] : (String(str).startsWith('http') ? str : '');
       };
 
       const fetchSheetData = () => {
@@ -62,36 +45,45 @@
 
         Papa.parse(csvUrl, {
           download: true,
-          header: true,
+          header: false, // Turn off header parsing to rely on exact column indexes
           skipEmptyLines: true,
           complete: (results) => {
             if (results.data && results.data.length > 0) {
-              const formatted = results.data.map((row, idx) => {
-                const sampleId = getColumnValue(row, ['Sample ID', 'SampleID', 'sample_id', 'ID']) || `SMP-${idx + 1}`;
-                const sampleName = getColumnValue(row, ['Sample Name', 'SampleName', 'sample_name', 'Name']) || `Sample ${idx + 1}`;
-                const rawSheetUrl = getColumnValue(row, ['Sample Sheet', 'SampleSheet', 'Sheet Link', 'Link', 'URL']);
-                const clientReq = getColumnValue(row, ['Client/Requirement', 'Client / Requirement', 'Client Requirement', 'Requirement', 'ClientReq']);
-                const tags = getColumnValue(row, ['Keywords / Tags', 'Keywords/Tags', 'Keywords', 'Tags', 'Tag']);
-                const location = getColumnValue(row, ['Location', 'Country']);
-                const project = getColumnValue(row, ['Project Yes/No', 'Project', 'Project Status']);
-                const difficulty = getColumnValue(row, ['Research Difficulty Index', 'Research Difficulty', 'Difficulty']);
-                const createdBy = getColumnValue(row, ['Sample Created By', 'Created By', 'Author']);
-                const industry = getColumnValue(row, ['Industry', 'Category']);
+              const rawRows = results.data;
+              
+              // Check if row 0 is header
+              const startIndex = (rawRows[0][0] && rawRows[0][0].toLowerCase().includes('sample')) ? 1 : 0;
+
+              const formatted = rawRows.slice(startIndex).map((row, idx) => {
+                // Column A = 0, B = 1, C = 2, D = 3, E = 4, F = 5, G = 6, H = 7, I = 8, J = 9, K = 10
+                const sampleId = row[0] ? String(row[0]).trim() : `SMP-${idx + 1}`;
+                const project = row[1] ? String(row[1]).trim() : 'Yes';
+                const date = row[2] ? String(row[2]).trim() : '';
+                const sampleName = row[3] ? String(row[3]).trim() : `Sample ${idx + 1}`;
+                const rawSheetUrl = row[4] ? String(row[4]).trim() : '';
+                const clientReq = row[5] ? String(row[5]).trim() : '-';
+                const difficulty = row[6] ? String(row[6]).trim() : '-';
+                const createdBy = row[7] ? String(row[7]).trim() : '-';
+                const tags = row[8] ? String(row[8]).trim() : '-';
+                const industry = row[9] ? String(row[9]).trim() : '-';
+                const location = row[10] ? String(row[10]).trim() : '-';
 
                 return {
                   id: idx.toString(),
                   sampleId,
+                  project,
+                  date,
                   sampleName,
                   sampleSheet: extractUrl(rawSheetUrl),
-                  clientRequirement: clientReq || '-',
-                  tags: tags || '-',
-                  location: location || '-',
-                  project: project || 'Yes',
-                  researchDifficulty: difficulty || '-',
-                  createdBy: createdBy || '-',
-                  industry: industry || '-'
+                  clientRequirement: clientReq,
+                  researchDifficulty: difficulty,
+                  createdBy,
+                  tags,
+                  industry,
+                  location
                 };
               });
+
               setSamples(formatted);
             }
             setLoading(false);
