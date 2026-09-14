@@ -1,11 +1,25 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sample Tracking Master Dashboard</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            darkbg: '#0B0F17',
+            cardbg: '#161F30',
+            borderdark: '#2A364F'
+          }
+        }
+      }
+    }
+  </script>
   <!-- React & ReactDOM -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
@@ -13,8 +27,25 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <!-- PapaParse -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <style>
+    /* Custom Scrollbar for Dark Theme */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0B0F17;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #2A364F;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #3B82F6;
+    }
+  </style>
 </head>
-<body class="bg-slate-100 text-slate-800 antialiased font-sans">
+<body class="bg-[#0B0F17] text-slate-100 antialiased font-sans min-h-screen">
   <div id="root"></div>
 
   <script type="text/babel">
@@ -37,15 +68,25 @@
       "E-Commerce Samples"
     ];
 
+    // Card Colors Array for vibrant diversity
+    const CARD_GRADIENTS = [
+      "from-blue-600/20 to-indigo-600/10 border-blue-500/30 hover:border-blue-400",
+      "from-purple-600/20 to-pink-600/10 border-purple-500/30 hover:border-purple-400",
+      "from-emerald-600/20 to-teal-600/10 border-emerald-500/30 hover:border-emerald-400",
+      "from-amber-600/20 to-orange-600/10 border-amber-500/30 hover:border-amber-400",
+      "from-cyan-600/20 to-blue-600/10 border-cyan-500/30 hover:border-cyan-400",
+      "from-rose-600/20 to-red-600/10 border-rose-500/30 hover:border-rose-400"
+    ];
+
     function App() {
       const [activeTab, setActiveTab] = useState(SHEET_TABS[0]);
       const [samples, setSamples] = useState([]);
       const [loading, setLoading] = useState(true);
       const [searchTerm, setSearchTerm] = useState("");
       const [selectedLocations, setSelectedLocations] = useState([]);
+      const [selectedIndustries, setSelectedIndustries] = useState([]);
       const [selectedSample, setSelectedSample] = useState(null);
       const [viewMode, setViewMode] = useState("grid");
-      const [errorMsg, setErrorMsg] = useState("");
 
       useEffect(() => {
         fetchSheetData(activeTab);
@@ -59,9 +100,6 @@
 
       const fetchSheetData = (tabName) => {
         setLoading(true);
-        setErrorMsg("");
-
-        // Multi-proxy endpoints to ensure zero CORS/Empty issue
         const encodedTab = encodeURIComponent(tabName);
         const gvizUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodedTab}`;
         const corsProxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(gvizUrl)}`;
@@ -77,9 +115,7 @@
               tryDirectFetch(gvizUrl, tabName);
             }
           },
-          error: () => {
-            tryDirectFetch(gvizUrl, tabName);
-          }
+          error: () => tryDirectFetch(gvizUrl, tabName)
         });
       };
 
@@ -94,47 +130,86 @@
             } else {
               setSamples([]);
               setLoading(false);
-              setErrorMsg("No records found in this sheet tab.");
             }
           },
-          error: (err) => {
+          error: () => {
             setSamples([]);
             setLoading(false);
-            setErrorMsg("Could not load sheet data. Make sure 'Publish to Web' is enabled in Google Sheets.");
           }
         });
       };
 
       const parseRows = (rawRows, tabName) => {
-        let rowsToProcess = rawRows;
-
-        // Skip header row if matches sample columns
-        let startIndex = 0;
-        if (rowsToProcess[0] && rowsToProcess[0].some(cell => {
-          const str = String(cell).toLowerCase();
-          return str.includes('sample') || str.includes('name') || str.includes('client') || str.includes('id') || str.includes('req');
-        })) {
-          startIndex = 1;
+        if (!rawRows || rawRows.length === 0) {
+          setSamples([]);
+          setLoading(false);
+          return;
         }
 
-        const formatted = rowsToProcess.slice(startIndex).filter(row => row.some(cell => String(cell).trim() !== '')).map((row, idx) => {
-          const sampleId = row[0] ? String(row[0]).trim() : `SMP-${idx + 1}`;
-          const project = row[1] ? String(row[1]).trim() : 'Yes';
-          const date = row[2] ? String(row[2]).trim() : '';
-          const sampleName = row[3] ? String(row[3]).trim() : (row[0] ? String(row[0]).trim() : `Record ${idx + 1}`);
-          const rawSheetUrl = row[4] ? String(row[4]).trim() : '';
-          const clientReq = row[5] ? String(row[5]).trim() : '-';
-          const difficulty = row[6] ? String(row[6]).trim() : '-';
-          const createdBy = row[7] ? String(row[7]).trim() : '-';
-          const tags = row[8] ? String(row[8]).trim() : '-';
-          const industry = row[9] ? String(row[9]).trim() : '-';
-          const location = row[10] ? String(row[10]).trim() : '-';
+        // Detect column indices dynamically based on header
+        let headerIndex = -1;
+        let colMap = {
+          id: 0,
+          name: 3,
+          url: 4,
+          clientReq: 5,
+          difficulty: 6,
+          createdBy: 7,
+          tags: 8,
+          industry: 9,
+          location: 10
+        };
+
+        for (let i = 0; i < Math.min(5, rawRows.length); i++) {
+          const rowStr = rawRows[i].map(c => String(c).toLowerCase()).join(' ');
+          if (rowStr.includes('sample') || rowStr.includes('name') || rowStr.includes('location') || rowStr.includes('requirement')) {
+            headerIndex = i;
+            rawRows[i].forEach((cell, colIdx) => {
+              const c = String(cell).toLowerCase().trim();
+              if (c.includes('id')) colMap.id = colIdx;
+              if (c.includes('name') || c.includes('title')) colMap.name = colIdx;
+              if (c.includes('link') || c.includes('url') || c.includes('sheet')) colMap.url = colIdx;
+              if (c.includes('req') || c.includes('client')) colMap.clientReq = colIdx;
+              if (c.includes('tag') || c.includes('key')) colMap.tags = colIdx;
+              if (c.includes('industry')) colMap.industry = colIdx;
+              if (c.includes('location') || c.includes('city') || c.includes('country')) colMap.location = colIdx;
+            });
+            break;
+          }
+        }
+
+        const startIndex = headerIndex >= 0 ? headerIndex + 1 : 0;
+
+        const formatted = rawRows.slice(startIndex).filter(row => row.some(cell => String(cell).trim() !== '')).map((row, idx) => {
+          const getVal = (colIdx) => row[colIdx] ? String(row[colIdx]).trim() : '';
+
+          const sampleId = getVal(colMap.id) || `SMP-${idx + 1}`;
+          const sampleName = getVal(colMap.name) || getVal(0) || `Record #${idx + 1}`;
+          const rawSheetUrl = getVal(colMap.url) || row.find(c => String(c).includes('http')) || '';
+          const clientReq = getVal(colMap.clientReq) || '-';
+          const difficulty = getVal(colMap.difficulty) || '-';
+          const createdBy = getVal(colMap.createdBy) || '-';
+          const tags = getVal(colMap.tags) || '-';
+          
+          // Smart extraction for Location and Industry if default index is empty
+          let location = getVal(colMap.location);
+          if (!location || location === '-') {
+            // Check in sample name if it has location info (e.g., "CHEMLOGISTICS INDIA MUMBAI")
+            const words = sampleName.split(' ');
+            if (words.length > 1) {
+              const lastWord = words[words.length - 1];
+              if (lastWord.length > 2 && lastWord === lastWord.toUpperCase()) {
+                location = lastWord;
+              }
+            }
+          }
+          if (!location) location = '-';
+
+          const industry = getVal(colMap.industry) || '-';
 
           return {
             id: `${tabName}-${idx}`,
             sampleId,
-            project,
-            date,
             sampleName,
             sampleSheet: extractUrl(rawSheetUrl),
             clientRequirement: clientReq,
@@ -143,7 +218,8 @@
             tags,
             industry,
             location,
-            tabName
+            tabName,
+            colorIndex: idx % CARD_GRADIENTS.length
           };
         });
 
@@ -151,6 +227,7 @@
         setLoading(false);
       };
 
+      // Extract unique locations for Sidebar
       const availableLocations = useMemo(() => {
         const locs = new Set();
         samples.forEach(s => {
@@ -158,7 +235,18 @@
             locs.add(s.location.trim());
           }
         });
-        return Array.from(locs);
+        return Array.from(locs).sort();
+      }, [samples]);
+
+      // Extract unique industries for Sidebar
+      const availableIndustries = useMemo(() => {
+        const ind = new Set();
+        samples.forEach(s => {
+          if (s.industry && s.industry !== '-' && s.industry.trim() !== '') {
+            ind.add(s.industry.trim());
+          }
+        });
+        return Array.from(ind).sort();
       }, [samples]);
 
       const filteredSamples = useMemo(() => {
@@ -173,10 +261,11 @@
             (item.tags && item.tags.toLowerCase().includes(search));
 
           const matchesLocation = selectedLocations.length === 0 || selectedLocations.includes(item.location);
+          const matchesIndustry = selectedIndustries.length === 0 || selectedIndustries.includes(item.industry);
 
-          return matchesSearch && matchesLocation;
+          return matchesSearch && matchesLocation && matchesIndustry;
         });
-      }, [samples, searchTerm, selectedLocations]);
+      }, [samples, searchTerm, selectedLocations, selectedIndustries]);
 
       const toggleLocation = (loc) => {
         setSelectedLocations(prev => 
@@ -184,40 +273,77 @@
         );
       };
 
+      const toggleIndustry = (ind) => {
+        setSelectedIndustries(prev => 
+          prev.includes(ind) ? prev.filter(x => x !== ind) : [...prev, ind]
+        );
+      };
+
+      const clearAllFilters = () => {
+        setSelectedLocations([]);
+        setSelectedIndustries([]);
+        setSearchTerm("");
+      };
+
       return (
-        <div class="min-h-screen flex flex-col bg-slate-100">
+        <div class="min-h-screen flex flex-col bg-[#0B0F17] text-slate-100">
           {/* Header */}
-          <header class="bg-slate-900 text-white sticky top-0 z-20 px-6 py-3 flex flex-wrap items-center justify-between gap-4 shadow-md">
+          <header class="bg-[#111827]/90 backdrop-blur-md border-b border-slate-800 sticky top-0 z-30 px-6 py-3.5 flex flex-wrap items-center justify-between gap-4 shadow-xl">
             <div class="flex items-center space-x-3">
-              <div class="p-2 bg-blue-600 text-white rounded-lg font-bold text-lg">ST</div>
+              <div class="p-2.5 bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 text-white rounded-xl font-black text-xl shadow-lg shadow-blue-500/20">
+                ST
+              </div>
               <div>
-                <h1 class="text-lg font-bold leading-none">Sample Tracking Master Dashboard</h1>
-                <p class="text-xs text-slate-400 mt-1">Live Multi-Tab Google Sheet Database</p>
+                <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+                  Sample Tracking Master Dashboard
+                  <span class="text-[10px] bg-blue-500/20 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded-full font-semibold">Live v2.0</span>
+                </h1>
+                <p class="text-xs text-slate-400">Live Multi-Tab Google Sheet Database</p>
               </div>
             </div>
 
-            <div class="flex-1 max-w-lg">
-              <input
-                type="text"
-                placeholder="🔍 Search ID, Name, Client Requirement, Tags, Location, Industry..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                class="w-full px-4 py-2 bg-slate-800 text-slate-100 border border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-400"
-              />
+            {/* Search Input */}
+            <div class="flex-1 max-w-xl">
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                  🔍
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search ID, Name, Requirement, Tags, Location, Industry..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  class="w-full pl-10 pr-4 py-2 bg-[#1F293D] text-slate-100 border border-slate-700/80 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-slate-400 transition"
+                />
+                {searchTerm && (
+                  <button onClick={() => setSearchTerm("")} class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-white">
+                    ✕
+                  </button>
+                )}
+              </div>
             </div>
 
+            {/* Action Buttons */}
             <div class="flex items-center space-x-3">
-              <button onClick={() => fetchSheetData(activeTab)} class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium border border-slate-700 flex items-center gap-1 transition">
-                🔄 {loading ? 'Syncing...' : 'Sync Sheet'}
+              <button 
+                onClick={() => fetchSheetData(activeTab)} 
+                class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold border border-slate-700 flex items-center gap-2 shadow-sm transition active:scale-95"
+              >
+                <span class={loading ? "animate-spin" : ""}>🔄</span>
+                <span>{loading ? 'Syncing...' : 'Sync Sheet'}</span>
               </button>
-              <button onClick={() => setViewMode(viewMode === 'grid' ? 'table' : 'grid')} class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium rounded-lg text-xs border border-slate-700 transition">
+              
+              <button 
+                onClick={() => setViewMode(viewMode === 'grid' ? 'table' : 'grid')} 
+                class="px-3.5 py-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-semibold rounded-xl text-xs shadow-md transition active:scale-95 flex items-center gap-1.5"
+              >
                 {viewMode === 'grid' ? '📊 Table View' : '🎴 Grid View'}
               </button>
             </div>
           </header>
 
           {/* Tab Navigation Bar */}
-          <div class="bg-white border-b border-slate-200 px-6 pt-2 pb-0 overflow-x-auto whitespace-nowrap shadow-sm">
+          <div class="bg-[#111827] border-b border-slate-800/80 px-6 pt-2 pb-0 overflow-x-auto whitespace-nowrap shadow-inner scrollbar-none">
             <div class="flex space-x-2">
               {SHEET_TABS.map((tab) => {
                 const isActive = activeTab === tab;
@@ -227,11 +353,12 @@
                     onClick={() => {
                       setActiveTab(tab);
                       setSelectedLocations([]);
+                      setSelectedIndustries([]);
                     }}
-                    class={`px-4 py-2.5 rounded-t-lg text-xs font-bold transition flex items-center gap-2 border-b-2 ${
+                    class={`px-4 py-2.5 rounded-t-xl text-xs font-bold transition-all flex items-center gap-2 border-b-2 ${
                       isActive 
-                        ? 'bg-blue-50 text-blue-700 border-blue-600' 
-                        : 'text-slate-600 hover:text-slate-900 border-transparent hover:bg-slate-50'
+                        ? 'bg-blue-600/10 text-blue-400 border-blue-500 shadow-sm' 
+                        : 'text-slate-400 hover:text-slate-200 border-transparent hover:bg-slate-800/50'
                     }`}
                   >
                     <span>📁</span>
@@ -243,170 +370,220 @@
           </div>
 
           <div class="flex flex-1">
-            {/* Sidebar */}
-            <aside class="w-64 bg-white border-r border-slate-200 p-4 shrink-0 hidden md:block">
+            {/* Sidebar Filters */}
+            <aside class="w-64 bg-[#111827]/60 border-r border-slate-800 p-4 shrink-0 hidden md:block">
+              <div class="flex justify-between items-center mb-4 pb-2 border-b border-slate-800">
+                <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                  ⚡ Filters
+                </h3>
+                {(selectedLocations.length > 0 || selectedIndustries.length > 0 || searchTerm) && (
+                  <button onClick={clearAllFilters} class="text-[11px] text-rose-400 font-bold hover:underline">
+                    Clear All
+                  </button>
+                )}
+              </div>
+
+              {/* Location Filter */}
               <div class="mb-6">
-                <div class="flex justify-between items-center mb-2">
-                  <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Location Filter</h3>
-                  {selectedLocations.length > 0 && (
-                    <button onClick={() => setSelectedLocations([])} class="text-[11px] text-blue-600 font-bold hover:underline">Clear</button>
-                  )}
-                </div>
+                <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2.5 flex justify-between">
+                  <span>📍 Location Filter</span>
+                  {selectedLocations.length > 0 && <span class="text-blue-400">({selectedLocations.length})</span>}
+                </h4>
 
                 {availableLocations.length > 0 ? (
-                  <div class="space-y-1 max-h-96 overflow-y-auto pr-1">
+                  <div class="space-y-1.5 max-h-56 overflow-y-auto pr-1">
                     {availableLocations.map(loc => (
-                      <label key={loc} class="flex items-center space-x-2 py-1 text-xs text-slate-700 cursor-pointer hover:bg-slate-50 px-1.5 rounded">
+                      <label key={loc} class="flex items-center space-x-2 py-1 px-2 text-xs text-slate-300 cursor-pointer hover:bg-slate-800/60 rounded-lg transition">
                         <input
                           type="checkbox"
                           checked={selectedLocations.includes(loc)}
                           onChange={() => toggleLocation(loc)}
-                          class="rounded text-blue-600 focus:ring-blue-500"
+                          class="rounded bg-slate-800 border-slate-600 text-blue-500 focus:ring-blue-500/50"
                         />
                         <span class="truncate">{loc}</span>
                       </label>
                     ))}
                   </div>
                 ) : (
-                  <p class="text-xs text-slate-400 italic">No specific locations listed in this tab.</p>
+                  <p class="text-xs text-slate-500 italic bg-slate-900/50 p-2 rounded-lg border border-slate-800">No specific location tags found.</p>
+                )}
+              </div>
+
+              {/* Industry Filter */}
+              <div class="mb-6">
+                <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2.5 flex justify-between">
+                  <span>🏭 Industry Filter</span>
+                  {selectedIndustries.length > 0 && <span class="text-blue-400">({selectedIndustries.length})</span>}
+                </h4>
+
+                {availableIndustries.length > 0 ? (
+                  <div class="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                    {availableIndustries.map(ind => (
+                      <label key={ind} class="flex items-center space-x-2 py-1 px-2 text-xs text-slate-300 cursor-pointer hover:bg-slate-800/60 rounded-lg transition">
+                        <input
+                          type="checkbox"
+                          checked={selectedIndustries.includes(ind)}
+                          onChange={() => toggleIndustry(ind)}
+                          class="rounded bg-slate-800 border-slate-600 text-blue-500 focus:ring-blue-500/50"
+                        />
+                        <span class="truncate">{ind}</span>
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <p class="text-xs text-slate-500 italic bg-slate-900/50 p-2 rounded-lg border border-slate-800">No industry tags found in tab.</p>
                 )}
               </div>
             </aside>
 
-            {/* Content */}
+            {/* Main Content Area */}
             <main class="flex-1 p-6">
-              <div class="mb-4 flex flex-wrap justify-between items-center gap-2">
+              <div class="mb-6 flex flex-wrap justify-between items-center gap-3 bg-[#111827]/40 p-4 rounded-2xl border border-slate-800">
                 <div>
-                  <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                  <h2 class="text-sm font-bold text-slate-200 flex items-center gap-2">
                     <span>Active Tab:</span>
-                    <span class="bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full text-xs font-extrabold">{activeTab}</span>
+                    <span class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-3 py-1 rounded-full text-xs font-black shadow-md">
+                      {activeTab}
+                    </span>
                   </h2>
-                  <p class="text-xs text-slate-500 mt-0.5">Showing {filteredSamples.length} records</p>
+                </div>
+                <div class="text-xs text-slate-400 font-semibold bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700/50">
+                  Showing <span class="text-blue-400 font-bold">{filteredSamples.length}</span> of {samples.length} records
                 </div>
               </div>
 
               {loading ? (
-                <div class="flex justify-center items-center py-20 text-slate-500 font-medium">
-                  <div class="flex items-center gap-3 bg-white px-6 py-4 rounded-xl shadow-sm border border-slate-200">
-                    <div class="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                    <span>Fetching live data from <b>"{activeTab}"</b>...</span>
+                <div class="flex justify-center items-center py-28 text-slate-400 font-medium">
+                  <div class="flex items-center gap-3 bg-[#161F30] px-8 py-5 rounded-2xl shadow-2xl border border-slate-700">
+                    <div class="w-6 h-6 border-3 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                    <span class="text-sm">Fetching live data from <b class="text-blue-400">"{activeTab}"</b>...</span>
                   </div>
                 </div>
-              ) : errorMsg ? (
-                <div class="bg-red-50 border border-red-200 text-red-700 rounded-xl p-6 text-center text-sm">
-                  ⚠️ {errorMsg}
-                </div>
               ) : filteredSamples.length === 0 ? (
-                <div class="bg-white rounded-xl border border-slate-200 p-10 text-center text-slate-500">
-                  📁 No matching records found in <b>"{activeTab}"</b>.
+                <div class="bg-[#161F30] rounded-2xl border border-slate-800 p-12 text-center text-slate-400 max-w-lg mx-auto shadow-xl">
+                  <div class="text-4xl mb-3">📁</div>
+                  <h3 class="text-base font-bold text-slate-200 mb-1">No matching records found</h3>
+                  <p class="text-xs text-slate-400 mb-4">Try clearing filters or searching for something else.</p>
+                  <button onClick={clearAllFilters} class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition">
+                    Reset All Filters
+                  </button>
                 </div>
               ) : viewMode === 'grid' ? (
+                /* Grid View */
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {filteredSamples.map(sample => (
-                    <div 
-                      key={sample.id} 
-                      onClick={() => setSelectedSample(sample)}
-                      class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm hover:shadow-md transition cursor-pointer flex flex-col justify-between hover:border-blue-400 group"
-                    >
-                      <div>
-                        <div class="flex justify-between items-start mb-2">
-                          <div>
-                            <span class="text-[10px] font-bold text-blue-600 uppercase tracking-wide block">{sample.sampleId}</span>
-                            <h2 class="font-bold text-sm text-slate-800 leading-snug group-hover:text-blue-600 transition">{sample.sampleName}</h2>
-                          </div>
-                          {sample.location && sample.location !== '-' && (
-                            <span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[10px] font-medium shrink-0 ml-2 border border-slate-200">
-                              📍 {sample.location}
-                            </span>
-                          )}
-                        </div>
-                        
-                        <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-100 my-2">
-                          <span class="text-[10px] font-bold text-slate-400 uppercase block">Client / Requirement:</span>
-                          <p class="text-xs text-slate-700 line-clamp-2 font-medium">
-                            {sample.clientRequirement !== '-' ? sample.clientRequirement : 'No requirement details'}
-                          </p>
-                        </div>
-
-                        <div class="space-y-1 mt-2">
-                          {sample.tags && sample.tags !== '-' && (
+                  {filteredSamples.map(sample => {
+                    const gradientClass = CARD_GRADIENTS[sample.colorIndex];
+                    return (
+                      <div 
+                        key={sample.id} 
+                        onClick={() => setSelectedSample(sample)}
+                        class={`bg-gradient-to-br bg-[#161F30] ${gradientClass} rounded-2xl p-4 border shadow-lg hover:shadow-2xl transition-all duration-200 cursor-pointer flex flex-col justify-between group hover:-translate-y-0.5`}
+                      >
+                        <div>
+                          <div class="flex justify-between items-start mb-2.5">
                             <div>
-                              <span class="text-[10px] font-bold text-slate-400 uppercase block">Keywords / Tags:</span>
-                              <span class="inline-block bg-blue-50 text-blue-700 text-[11px] px-2 py-0.5 rounded font-medium border border-blue-100 max-w-full truncate">
-                                🏷️ {sample.tags}
+                              <span class="text-[10px] font-black text-blue-400 uppercase tracking-wider block">{sample.sampleId}</span>
+                              <h3 class="font-bold text-sm text-slate-100 leading-snug group-hover:text-blue-300 transition line-clamp-2">
+                                {sample.sampleName}
+                              </h3>
+                            </div>
+                            {sample.location && sample.location !== '-' && (
+                              <span class="bg-blue-950/80 text-blue-300 border border-blue-800/60 px-2 py-0.5 rounded-lg text-[10px] font-semibold shrink-0 ml-2 shadow-sm">
+                                📍 {sample.location}
                               </span>
-                            </div>
-                          )}
+                            )}
+                          </div>
+                          
+                          <div class="bg-[#0B0F17]/60 p-3 rounded-xl border border-slate-800/80 my-2.5">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase block mb-0.5">Client / Requirement:</span>
+                            <p class="text-xs text-slate-300 line-clamp-2 font-medium">
+                              {sample.clientRequirement !== '-' ? sample.clientRequirement : 'No requirement details'}
+                            </p>
+                          </div>
 
-                          {sample.industry && sample.industry !== '-' && (
-                            <div>
-                              <span class="text-[10px] font-bold text-slate-400 uppercase block">Industry:</span>
-                              <span class="text-xs text-slate-600 font-medium">{sample.industry}</span>
-                            </div>
+                          <div class="space-y-1.5 mt-2">
+                            {sample.tags && sample.tags !== '-' && (
+                              <div>
+                                <span class="text-[10px] font-bold text-slate-400 uppercase block">Tags:</span>
+                                <span class="inline-block bg-indigo-950/80 text-indigo-300 border border-indigo-800/50 text-[11px] px-2 py-0.5 rounded-md font-medium max-w-full truncate">
+                                  🏷️ {sample.tags}
+                                </span>
+                              </div>
+                            )}
+
+                            {sample.industry && sample.industry !== '-' && (
+                              <div>
+                                <span class="text-[10px] font-bold text-slate-400 uppercase block">Industry:</span>
+                                <span class="text-xs text-slate-300 font-medium">{sample.industry}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div class="pt-3 mt-3 border-t border-slate-800/80 flex justify-end items-center">
+                          {sample.sampleSheet ? (
+                            <a 
+                              href={sample.sampleSheet} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()} 
+                              class="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1 shadow-md hover:shadow-blue-500/20"
+                            >
+                              🔗 Open Sheet ↗
+                            </a>
+                          ) : (
+                            <span class="text-xs text-slate-500 italic">No Link</span>
                           )}
                         </div>
                       </div>
-
-                      <div class="pt-3 mt-3 border-t border-slate-100 flex justify-end items-center">
-                        {sample.sampleSheet ? (
-                          <a 
-                            href={sample.sampleSheet} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()} 
-                            class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-sm"
-                          >
-                            🔗 Open Sample Sheet ↗
-                          </a>
-                        ) : (
-                          <span class="text-xs text-slate-400 italic">No Link</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
-                <div class="bg-white rounded-xl border border-slate-200 overflow-x-auto shadow-sm">
-                  <table class="w-full text-left text-sm">
-                    <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold text-xs uppercase">
-                      <tr>
-                        <th class="p-3">Sample ID</th>
-                        <th class="p-3">Sample Name</th>
-                        <th class="p-3">Client / Requirement</th>
-                        <th class="p-3">Keywords / Tags</th>
-                        <th class="p-3">Location</th>
-                        <th class="p-3">Industry</th>
-                        <th class="p-3">Sheet URL</th>
-                      </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100 text-xs">
-                      {filteredSamples.map(sample => (
-                        <tr key={sample.id} onClick={() => setSelectedSample(sample)} class="hover:bg-blue-50/50 cursor-pointer">
-                          <td class="p-3 font-bold text-slate-900">{sample.sampleId}</td>
-                          <td class="p-3 font-medium text-slate-800">{sample.sampleName}</td>
-                          <td class="p-3 text-slate-600 max-w-xs truncate">{sample.clientRequirement}</td>
-                          <td class="p-3 text-slate-700">{sample.tags}</td>
-                          <td class="p-3">{sample.location}</td>
-                          <td class="p-3">{sample.industry}</td>
-                          <td class="p-3">
-                            {sample.sampleSheet ? (
-                              <a 
-                                href={sample.sampleSheet} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                onClick={(e) => e.stopPropagation()} 
-                                class="text-blue-600 hover:underline font-bold text-xs bg-blue-50 px-2 py-1 rounded border border-blue-200"
-                              >
-                                🔗 Open Sheet ↗
-                              </a>
-                            ) : (
-                              <span class="text-slate-400 text-xs">-</span>
-                            )}
-                          </td>
+                /* Table View */
+                <div class="bg-[#161F30] rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                      <thead class="bg-[#111827] border-b border-slate-800 text-slate-400 font-bold text-xs uppercase tracking-wider">
+                        <tr>
+                          <th class="p-3.5">ID</th>
+                          <th class="p-3.5">Sample Name</th>
+                          <th class="p-3.5">Client / Requirement</th>
+                          <th class="p-3.5">Tags</th>
+                          <th class="p-3.5">Location</th>
+                          <th class="p-3.5">Industry</th>
+                          <th class="p-3.5">Sheet Link</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody class="divide-y divide-slate-800/60 text-xs">
+                        {filteredSamples.map(sample => (
+                          <tr key={sample.id} onClick={() => setSelectedSample(sample)} class="hover:bg-slate-800/40 transition cursor-pointer">
+                            <td class="p-3.5 font-bold text-blue-400">{sample.sampleId}</td>
+                            <td class="p-3.5 font-semibold text-slate-200">{sample.sampleName}</td>
+                            <td class="p-3.5 text-slate-300 max-w-xs truncate">{sample.clientRequirement}</td>
+                            <td class="p-3.5 text-indigo-300">{sample.tags}</td>
+                            <td class="p-3.5 text-slate-300">{sample.location}</td>
+                            <td class="p-3.5 text-slate-300">{sample.industry}</td>
+                            <td class="p-3.5">
+                              {sample.sampleSheet ? (
+                                <a 
+                                  href={sample.sampleSheet} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()} 
+                                  class="text-blue-400 hover:text-blue-300 font-bold text-xs bg-blue-950/60 px-2.5 py-1 rounded-lg border border-blue-800/50 inline-block"
+                                >
+                                  🔗 Open ↗
+                                </a>
+                              ) : (
+                                <span class="text-slate-600">-</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </main>
@@ -414,43 +591,43 @@
 
           {/* Modal */}
           {selectedSample && (
-            <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-              <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative border border-slate-100">
-                <button onClick={() => setSelectedSample(null)} class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 font-bold text-lg">✕</button>
+            <div class="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 z-50">
+              <div class="bg-[#161F30] rounded-2xl max-w-lg w-full p-6 shadow-2xl relative border border-slate-700">
+                <button onClick={() => setSelectedSample(null)} class="absolute top-4 right-4 text-slate-400 hover:text-white font-bold text-lg">✕</button>
                 <div class="flex items-center gap-2 mb-1">
-                  <span class="text-xs font-bold text-blue-600 uppercase">{selectedSample.sampleId}</span>
-                  <span class="text-[10px] bg-slate-100 text-slate-600 font-bold px-2 py-0.5 rounded">{selectedSample.tabName}</span>
+                  <span class="text-xs font-bold text-blue-400 uppercase tracking-wider">{selectedSample.sampleId}</span>
+                  <span class="text-[10px] bg-slate-800 text-slate-300 font-semibold px-2 py-0.5 rounded-md">{selectedSample.tabName}</span>
                 </div>
-                <h2 class="text-xl font-bold text-slate-900 mb-4">{selectedSample.sampleName}</h2>
+                <h2 class="text-xl font-bold text-white mb-4 leading-snug">{selectedSample.sampleName}</h2>
 
-                <div class="space-y-3 text-sm">
+                <div class="space-y-3.5 text-sm">
                   <div>
-                    <h4 class="font-bold text-slate-500 text-xs uppercase">Client / Requirement:</h4>
-                    <p class="text-slate-800 bg-slate-50 p-2.5 rounded-lg border border-slate-200 mt-1 font-medium">{selectedSample.clientRequirement}</p>
+                    <h4 class="font-bold text-slate-400 text-xs uppercase tracking-wider">Client / Requirement:</h4>
+                    <p class="text-slate-200 bg-[#0B0F17] p-3 rounded-xl border border-slate-800 mt-1 font-medium">{selectedSample.clientRequirement}</p>
                   </div>
 
                   <div>
-                    <h4 class="font-bold text-slate-500 text-xs uppercase">Keywords / Tags:</h4>
-                    <p class="text-slate-800 bg-slate-50 p-2.5 rounded-lg border border-slate-200 mt-1 font-medium">{selectedSample.tags}</p>
+                    <h4 class="font-bold text-slate-400 text-xs uppercase tracking-wider">Keywords / Tags:</h4>
+                    <p class="text-indigo-300 bg-[#0B0F17] p-3 rounded-xl border border-slate-800 mt-1 font-medium">{selectedSample.tags}</p>
                   </div>
 
-                  <div class="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs">
-                    <div><span class="text-slate-400 block">Location:</span><span class="font-semibold text-slate-700">{selectedSample.location}</span></div>
-                    <div><span class="text-slate-400 block">Industry:</span><span class="font-semibold text-slate-700">{selectedSample.industry}</span></div>
-                    <div><span class="text-slate-400 block">Difficulty Index:</span><span class="font-semibold text-slate-700">{selectedSample.researchDifficulty}</span></div>
-                    <div><span class="text-slate-400 block">Created By:</span><span class="font-semibold text-slate-700">{selectedSample.createdBy}</span></div>
+                  <div class="grid grid-cols-2 gap-3 bg-[#0B0F17] p-3.5 rounded-xl border border-slate-800 text-xs">
+                    <div><span class="text-slate-400 block">Location:</span><span class="font-semibold text-slate-200">{selectedSample.location}</span></div>
+                    <div><span class="text-slate-400 block">Industry:</span><span class="font-semibold text-slate-200">{selectedSample.industry}</span></div>
+                    <div><span class="text-slate-400 block">Difficulty Index:</span><span class="font-semibold text-slate-200">{selectedSample.researchDifficulty}</span></div>
+                    <div><span class="text-slate-400 block">Created By:</span><span class="font-semibold text-slate-200">{selectedSample.createdBy}</span></div>
                   </div>
                 </div>
 
-                <div class="mt-6 flex justify-between items-center">
+                <div class="mt-6 flex justify-between items-center pt-3 border-t border-slate-800">
                   {selectedSample.sampleSheet ? (
-                    <a href={selectedSample.sampleSheet} target="_blank" rel="noopener noreferrer" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg text-sm hover:bg-blue-700 shadow">
+                    <a href={selectedSample.sampleSheet} target="_blank" rel="noopener noreferrer" class="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-xl text-xs hover:from-blue-500 hover:to-indigo-500 shadow-lg">
                       🔗 Open Sample Sheet ↗
                     </a>
                   ) : (
-                    <span class="text-sm text-slate-400 italic">No Sheet Link Available</span>
+                    <span class="text-xs text-slate-500 italic">No Link Available</span>
                   )}
-                  <button onClick={() => setSelectedSample(null)} class="px-4 py-2 bg-slate-200 text-slate-700 font-semibold rounded-lg text-sm">Close</button>
+                  <button onClick={() => setSelectedSample(null)} class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-xs border border-slate-700">Close</button>
                 </div>
               </div>
             </div>
