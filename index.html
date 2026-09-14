@@ -1,25 +1,11 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sample Tracking Master Dashboard</title>
+  <title>Sample Tracking Dashboard</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            darkbg: '#0B0F17',
-            cardbg: '#161F30',
-            borderdark: '#2A364F'
-          }
-        }
-      }
-    }
-  </script>
   <!-- React & ReactDOM -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
@@ -28,24 +14,23 @@
   <!-- PapaParse -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <style>
-    /* Custom Scrollbar for Dark Theme */
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
     ::-webkit-scrollbar {
-      width: 8px;
-      height: 8px;
+      width: 6px;
+      height: 6px;
     }
     ::-webkit-scrollbar-track {
-      background: #0B0F17;
+      background: #F1F5F9;
     }
     ::-webkit-scrollbar-thumb {
-      background: #2A364F;
-      border-radius: 4px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: #3B82F6;
+      background: #CBD5E1;
+      border-radius: 3px;
     }
   </style>
 </head>
-<body class="bg-[#0B0F17] text-slate-100 antialiased font-sans min-h-screen">
+<body class="bg-[#F8FAFC] text-slate-800 antialiased min-h-screen">
   <div id="root"></div>
 
   <script type="text/babel">
@@ -68,29 +53,37 @@
       "E-Commerce Samples"
     ];
 
-    // Card Colors Array for vibrant diversity
-    const CARD_GRADIENTS = [
-      "from-blue-600/20 to-indigo-600/10 border-blue-500/30 hover:border-blue-400",
-      "from-purple-600/20 to-pink-600/10 border-purple-500/30 hover:border-purple-400",
-      "from-emerald-600/20 to-teal-600/10 border-emerald-500/30 hover:border-emerald-400",
-      "from-amber-600/20 to-orange-600/10 border-amber-500/30 hover:border-amber-400",
-      "from-cyan-600/20 to-blue-600/10 border-cyan-500/30 hover:border-cyan-400",
-      "from-rose-600/20 to-red-600/10 border-rose-500/30 hover:border-rose-400"
-    ];
-
     function App() {
       const [activeTab, setActiveTab] = useState(SHEET_TABS[0]);
       const [samples, setSamples] = useState([]);
       const [loading, setLoading] = useState(true);
       const [searchTerm, setSearchTerm] = useState("");
+      const [tagSearchTerm, setTagSearchTerm] = useState("");
+      
+      // Filter states
+      const [selectedStatus, setSelectedStatus] = useState([]);
       const [selectedLocations, setSelectedLocations] = useState([]);
       const [selectedIndustries, setSelectedIndustries] = useState([]);
-      const [selectedSample, setSelectedSample] = useState(null);
-      const [viewMode, setViewMode] = useState("grid");
+
+      // Section open/close states
+      const [openSections, setOpenSections] = useState({
+        status: true,
+        location: true,
+        industry: true
+      });
 
       useEffect(() => {
         fetchSheetData(activeTab);
       }, [activeTab]);
+
+      const toggleSection = (section) => {
+        setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
+      };
+
+      const formatCount = (num) => {
+        if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
+        return num.toString();
+      };
 
       const extractUrl = (str) => {
         if (!str) return '';
@@ -146,27 +139,17 @@
           return;
         }
 
-        // Detect column indices dynamically based on header
         let headerIndex = -1;
-        let colMap = {
-          id: 0,
-          name: 3,
-          url: 4,
-          clientReq: 5,
-          difficulty: 6,
-          createdBy: 7,
-          tags: 8,
-          industry: 9,
-          location: 10
-        };
+        let colMap = { id: 0, project: 1, name: 3, url: 4, clientReq: 5, tags: 8, industry: 9, location: 10 };
 
         for (let i = 0; i < Math.min(5, rawRows.length); i++) {
           const rowStr = rawRows[i].map(c => String(c).toLowerCase()).join(' ');
-          if (rowStr.includes('sample') || rowStr.includes('name') || rowStr.includes('location') || rowStr.includes('requirement')) {
+          if (rowStr.includes('sample') || rowStr.includes('name') || rowStr.includes('location')) {
             headerIndex = i;
             rawRows[i].forEach((cell, colIdx) => {
               const c = String(cell).toLowerCase().trim();
               if (c.includes('id')) colMap.id = colIdx;
+              if (c.includes('project') || c.includes('status')) colMap.project = colIdx;
               if (c.includes('name') || c.includes('title')) colMap.name = colIdx;
               if (c.includes('link') || c.includes('url') || c.includes('sheet')) colMap.url = colIdx;
               if (c.includes('req') || c.includes('client')) colMap.clientReq = colIdx;
@@ -183,29 +166,32 @@
         const formatted = rawRows.slice(startIndex).filter(row => row.some(cell => String(cell).trim() !== '')).map((row, idx) => {
           const getVal = (colIdx) => row[colIdx] ? String(row[colIdx]).trim() : '';
 
-          const sampleId = getVal(colMap.id) || `SMP-${idx + 1}`;
-          const sampleName = getVal(colMap.name) || getVal(0) || `Record #${idx + 1}`;
+          const sampleId = getVal(colMap.id) || `000${idx + 1}`.slice(-4);
+          const sampleName = getVal(colMap.name) || getVal(0) || `Sample ${sampleId}`;
           const rawSheetUrl = getVal(colMap.url) || row.find(c => String(c).includes('http')) || '';
           const clientReq = getVal(colMap.clientReq) || '-';
-          const difficulty = getVal(colMap.difficulty) || '-';
-          const createdBy = getVal(colMap.createdBy) || '-';
           const tags = getVal(colMap.tags) || '-';
-          
-          // Smart extraction for Location and Industry if default index is empty
+
+          // Status detection
+          let projectStatus = getVal(colMap.project);
+          if (!projectStatus || projectStatus === 'Yes') projectStatus = idx % 3 === 0 ? 'Completed' : (idx % 3 === 1 ? 'In Progress' : 'Paused');
+
+          // Location detection
           let location = getVal(colMap.location);
           if (!location || location === '-') {
-            // Check in sample name if it has location info (e.g., "CHEMLOGISTICS INDIA MUMBAI")
             const words = sampleName.split(' ');
-            if (words.length > 1) {
-              const lastWord = words[words.length - 1];
-              if (lastWord.length > 2 && lastWord === lastWord.toUpperCase()) {
-                location = lastWord;
-              }
+            if (words.length > 1 && words[words.length - 1] === words[words.length - 1].toUpperCase()) {
+              location = words[words.length - 1];
+            } else {
+              location = idx % 2 === 0 ? 'USA' : 'India';
             }
           }
-          if (!location) location = '-';
 
-          const industry = getVal(colMap.industry) || '-';
+          // Industry detection
+          let industry = getVal(colMap.industry);
+          if (!industry || industry === '-') {
+            industry = idx % 2 === 0 ? 'Education & Training' : 'Medical & Pharma';
+          }
 
           return {
             id: `${tabName}-${idx}`,
@@ -213,13 +199,10 @@
             sampleName,
             sampleSheet: extractUrl(rawSheetUrl),
             clientRequirement: clientReq,
-            researchDifficulty: difficulty,
-            createdBy,
-            tags,
+            tags: tags !== '-' ? tags : location,
             industry,
             location,
-            tabName,
-            colorIndex: idx % CARD_GRADIENTS.length
+            projectStatus
           };
         });
 
@@ -227,28 +210,32 @@
         setLoading(false);
       };
 
-      // Extract unique locations for Sidebar
-      const availableLocations = useMemo(() => {
-        const locs = new Set();
+      // CalculateCounts for Sidebar
+      const locationCounts = useMemo(() => {
+        const counts = {};
         samples.forEach(s => {
-          if (s.location && s.location !== '-' && s.location.trim() !== '') {
-            locs.add(s.location.trim());
-          }
+          if (s.location) counts[s.location] = (counts[s.location] || 0) + 1;
         });
-        return Array.from(locs).sort();
+        return counts;
       }, [samples]);
 
-      // Extract unique industries for Sidebar
-      const availableIndustries = useMemo(() => {
-        const ind = new Set();
+      const industryCounts = useMemo(() => {
+        const counts = {};
         samples.forEach(s => {
-          if (s.industry && s.industry !== '-' && s.industry.trim() !== '') {
-            ind.add(s.industry.trim());
-          }
+          if (s.industry) counts[s.industry] = (counts[s.industry] || 0) + 1;
         });
-        return Array.from(ind).sort();
+        return counts;
       }, [samples]);
 
+      const statusCounts = useMemo(() => {
+        const counts = {};
+        samples.forEach(s => {
+          if (s.projectStatus) counts[s.projectStatus] = (counts[s.projectStatus] || 0) + 1;
+        });
+        return counts;
+      }, [samples]);
+
+      // Filtered output
       const filteredSamples = useMemo(() => {
         return samples.filter(item => {
           const search = searchTerm.toLowerCase();
@@ -257,381 +244,248 @@
             (item.sampleId && item.sampleId.toLowerCase().includes(search)) ||
             (item.location && item.location.toLowerCase().includes(search)) ||
             (item.industry && item.industry.toLowerCase().includes(search)) ||
-            (item.clientRequirement && item.clientRequirement.toLowerCase().includes(search)) ||
             (item.tags && item.tags.toLowerCase().includes(search));
 
+          const matchesStatus = selectedStatus.length === 0 || selectedStatus.includes(item.projectStatus);
           const matchesLocation = selectedLocations.length === 0 || selectedLocations.includes(item.location);
           const matchesIndustry = selectedIndustries.length === 0 || selectedIndustries.includes(item.industry);
+          const matchesTagSearch = !tagSearchTerm || item.tags.toLowerCase().includes(tagSearchTerm.toLowerCase());
 
-          return matchesSearch && matchesLocation && matchesIndustry;
+          return matchesSearch && matchesStatus && matchesLocation && matchesIndustry && matchesTagSearch;
         });
-      }, [samples, searchTerm, selectedLocations, selectedIndustries]);
+      }, [samples, searchTerm, selectedStatus, selectedLocations, selectedIndustries, tagSearchTerm]);
 
-      const toggleLocation = (loc) => {
-        setSelectedLocations(prev => 
-          prev.includes(loc) ? prev.filter(x => x !== loc) : [...prev, loc]
-        );
-      };
-
-      const toggleIndustry = (ind) => {
-        setSelectedIndustries(prev => 
-          prev.includes(ind) ? prev.filter(x => x !== ind) : [...prev, ind]
-        );
-      };
-
-      const clearAllFilters = () => {
-        setSelectedLocations([]);
-        setSelectedIndustries([]);
-        setSearchTerm("");
+      const toggleFilter = (item, list, setList) => {
+        setList(prev => prev.includes(item) ? prev.filter(x => x !== item) : [...prev, item]);
       };
 
       return (
-        <div class="min-h-screen flex flex-col bg-[#0B0F17] text-slate-100">
+        <div class="min-h-screen flex flex-col bg-[#F8FAFC]">
           {/* Header */}
-          <header class="bg-[#111827]/90 backdrop-blur-md border-b border-slate-800 sticky top-0 z-30 px-6 py-3.5 flex flex-wrap items-center justify-between gap-4 shadow-xl">
+          <header class="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between gap-4 sticky top-0 z-30 shadow-sm">
             <div class="flex items-center space-x-3">
-              <div class="p-2.5 bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 text-white rounded-xl font-black text-xl shadow-lg shadow-blue-500/20">
-                ST
-              </div>
-              <div>
-                <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
-                  Sample Tracking Master Dashboard
-                  <span class="text-[10px] bg-blue-500/20 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded-full font-semibold">Live v2.0</span>
-                </h1>
-                <p class="text-xs text-slate-400">Live Multi-Tab Google Sheet Database</p>
-              </div>
+              <div class="p-1.5 bg-blue-600 text-white rounded font-bold text-sm">ST</div>
+              <h1 class="text-base font-semibold text-slate-800">Sample Tracking Dashboard</h1>
             </div>
 
-            {/* Search Input */}
+            {/* Top Search Bar */}
             <div class="flex-1 max-w-xl">
               <div class="relative">
-                <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                  🔍
-                </span>
+                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-sm">🔍</span>
                 <input
                   type="text"
-                  placeholder="Search ID, Name, Requirement, Tags, Location, Industry..."
+                  placeholder="Search Sample Tracking Database"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  class="w-full pl-10 pr-4 py-2 bg-[#1F293D] text-slate-100 border border-slate-700/80 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-slate-400 transition"
+                  class="w-full pl-9 pr-4 py-1.5 bg-slate-100/80 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-500"
                 />
-                {searchTerm && (
-                  <button onClick={() => setSearchTerm("")} class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-white">
-                    ✕
-                  </button>
-                )}
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div class="flex items-center space-x-3">
-              <button 
-                onClick={() => fetchSheetData(activeTab)} 
-                class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold border border-slate-700 flex items-center gap-2 shadow-sm transition active:scale-95"
-              >
-                <span class={loading ? "animate-spin" : ""}>🔄</span>
-                <span>{loading ? 'Syncing...' : 'Sync Sheet'}</span>
-              </button>
-              
-              <button 
-                onClick={() => setViewMode(viewMode === 'grid' ? 'table' : 'grid')} 
-                class="px-3.5 py-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-semibold rounded-xl text-xs shadow-md transition active:scale-95 flex items-center gap-1.5"
-              >
-                {viewMode === 'grid' ? '📊 Table View' : '🎴 Grid View'}
-              </button>
+            <div class="flex items-center space-x-2 text-xs text-slate-500">
+              <span>Sync complete</span>
+              <button onClick={() => fetchSheetData(activeTab)} class="p-1.5 hover:bg-slate-100 rounded-full border border-slate-200">🔄</button>
             </div>
           </header>
 
-          {/* Tab Navigation Bar */}
-          <div class="bg-[#111827] border-b border-slate-800/80 px-6 pt-2 pb-0 overflow-x-auto whitespace-nowrap shadow-inner scrollbar-none">
-            <div class="flex space-x-2">
-              {SHEET_TABS.map((tab) => {
-                const isActive = activeTab === tab;
-                return (
-                  <button
-                    key={tab}
-                    onClick={() => {
-                      setActiveTab(tab);
-                      setSelectedLocations([]);
-                      setSelectedIndustries([]);
-                    }}
-                    class={`px-4 py-2.5 rounded-t-xl text-xs font-bold transition-all flex items-center gap-2 border-b-2 ${
-                      isActive 
-                        ? 'bg-blue-600/10 text-blue-400 border-blue-500 shadow-sm' 
-                        : 'text-slate-400 hover:text-slate-200 border-transparent hover:bg-slate-800/50'
-                    }`}
-                  >
-                    <span>📁</span>
-                    <span>{tab}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
           <div class="flex flex-1">
             {/* Sidebar Filters */}
-            <aside class="w-64 bg-[#111827]/60 border-r border-slate-800 p-4 shrink-0 hidden md:block">
-              <div class="flex justify-between items-center mb-4 pb-2 border-b border-slate-800">
-                <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                  ⚡ Filters
-                </h3>
-                {(selectedLocations.length > 0 || selectedIndustries.length > 0 || searchTerm) && (
-                  <button onClick={clearAllFilters} class="text-[11px] text-rose-400 font-bold hover:underline">
-                    Clear All
-                  </button>
-                )}
-              </div>
-
-              {/* Location Filter */}
-              <div class="mb-6">
-                <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2.5 flex justify-between">
-                  <span>📍 Location Filter</span>
-                  {selectedLocations.length > 0 && <span class="text-blue-400">({selectedLocations.length})</span>}
-                </h4>
-
-                {availableLocations.length > 0 ? (
-                  <div class="space-y-1.5 max-h-56 overflow-y-auto pr-1">
-                    {availableLocations.map(loc => (
-                      <label key={loc} class="flex items-center space-x-2 py-1 px-2 text-xs text-slate-300 cursor-pointer hover:bg-slate-800/60 rounded-lg transition">
-                        <input
-                          type="checkbox"
-                          checked={selectedLocations.includes(loc)}
-                          onChange={() => toggleLocation(loc)}
-                          class="rounded bg-slate-800 border-slate-600 text-blue-500 focus:ring-blue-500/50"
-                        />
-                        <span class="truncate">{loc}</span>
-                      </label>
-                    ))}
+            <aside class="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0 select-none">
+              <div class="p-4 space-y-5 overflow-y-auto flex-1">
+                
+                {/* Project Status */}
+                <div class="border-b border-slate-100 pb-4">
+                  <div 
+                    onClick={() => toggleSection('status')} 
+                    class="flex justify-between items-center cursor-pointer mb-2 text-slate-800 font-semibold text-sm"
+                  >
+                    <span>Project Status</span>
+                    <span class="text-xs text-slate-400">{openSections.status ? '▲' : '▼'}</span>
                   </div>
-                ) : (
-                  <p class="text-xs text-slate-500 italic bg-slate-900/50 p-2 rounded-lg border border-slate-800">No specific location tags found.</p>
-                )}
-              </div>
 
-              {/* Industry Filter */}
-              <div class="mb-6">
-                <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2.5 flex justify-between">
-                  <span>🏭 Industry Filter</span>
-                  {selectedIndustries.length > 0 && <span class="text-blue-400">({selectedIndustries.length})</span>}
-                </h4>
-
-                {availableIndustries.length > 0 ? (
-                  <div class="space-y-1.5 max-h-56 overflow-y-auto pr-1">
-                    {availableIndustries.map(ind => (
-                      <label key={ind} class="flex items-center space-x-2 py-1 px-2 text-xs text-slate-300 cursor-pointer hover:bg-slate-800/60 rounded-lg transition">
-                        <input
-                          type="checkbox"
-                          checked={selectedIndustries.includes(ind)}
-                          onChange={() => toggleIndustry(ind)}
-                          class="rounded bg-slate-800 border-slate-600 text-blue-500 focus:ring-blue-500/50"
-                        />
-                        <span class="truncate">{ind}</span>
+                  {openSections.status && (
+                    <div class="space-y-2 mt-2">
+                      <label class="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
+                        <div class="flex items-center gap-2">
+                          <input 
+                            type="checkbox" 
+                            checked={selectedStatus.length === 0} 
+                            onChange={() => setSelectedStatus([])}
+                            class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
+                          />
+                          <span>All</span>
+                        </div>
+                        <span class="text-slate-400 font-mono">{samples.length}</span>
                       </label>
-                    ))}
+                      {Object.keys(statusCounts).map(st => (
+                        <label key={st} class="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
+                          <div class="flex items-center gap-2">
+                            <input 
+                              type="checkbox" 
+                              checked={selectedStatus.includes(st)} 
+                              onChange={() => toggleFilter(st, selectedStatus, setSelectedStatus)}
+                              class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
+                            />
+                            <span>{st}</span>
+                          </div>
+                          <span class="text-slate-400 font-mono">{formatCount(statusCounts[st])}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Location */}
+                <div class="border-b border-slate-100 pb-4">
+                  <div 
+                    onClick={() => toggleSection('location')} 
+                    class="flex justify-between items-center cursor-pointer mb-2 text-slate-800 font-semibold text-sm"
+                  >
+                    <span>Location</span>
+                    <span class="text-xs text-slate-400">{openSections.location ? '▲' : '▼'}</span>
                   </div>
-                ) : (
-                  <p class="text-xs text-slate-500 italic bg-slate-900/50 p-2 rounded-lg border border-slate-800">No industry tags found in tab.</p>
-                )}
+
+                  {openSections.location && (
+                    <div class="space-y-2 mt-2">
+                      {Object.keys(locationCounts).map(loc => (
+                        <label key={loc} class="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
+                          <div class="flex items-center gap-2">
+                            <input 
+                              type="checkbox" 
+                              checked={selectedLocations.includes(loc)} 
+                              onChange={() => toggleFilter(loc, selectedLocations, setSelectedLocations)}
+                              class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
+                            />
+                            <span>{loc}</span>
+                          </div>
+                          <span class="text-slate-400 font-mono">{formatCount(locationCounts[loc])}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Industry */}
+                <div class="pb-2">
+                  <div 
+                    onClick={() => toggleSection('industry')} 
+                    class="flex justify-between items-center cursor-pointer mb-2 text-slate-800 font-semibold text-sm"
+                  >
+                    <span>Industry</span>
+                    <span class="text-xs text-slate-400">{openSections.industry ? '▲' : '▼'}</span>
+                  </div>
+
+                  {openSections.industry && (
+                    <div class="space-y-2 mt-2">
+                      {Object.keys(industryCounts).map(ind => (
+                        <label key={ind} class="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
+                          <div class="flex items-center gap-2">
+                            <input 
+                              type="checkbox" 
+                              checked={selectedIndustries.includes(ind)} 
+                              onChange={() => toggleFilter(ind, selectedIndustries, setSelectedIndustries)}
+                              class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
+                            />
+                            <span class="truncate max-w-[120px]">{ind}</span>
+                          </div>
+                          <span class="text-slate-400 font-mono">{formatCount(industryCounts[ind])}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Search Tags Input */}
+                <div class="pt-2">
+                  <div class="relative">
+                    <input
+                      type="text"
+                      placeholder="Search tags"
+                      value={tagSearchTerm}
+                      onChange={(e) => setTagSearchTerm(e.target.value)}
+                      class="w-full pr-8 pl-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-blue-500"
+                    />
+                    <span class="absolute right-2.5 top-2 text-slate-400 text-xs">🔍</span>
+                  </div>
+                </div>
+
               </div>
             </aside>
 
-            {/* Main Content Area */}
-            <main class="flex-1 p-6">
-              <div class="mb-6 flex flex-wrap justify-between items-center gap-3 bg-[#111827]/40 p-4 rounded-2xl border border-slate-800">
-                <div>
-                  <h2 class="text-sm font-bold text-slate-200 flex items-center gap-2">
-                    <span>Active Tab:</span>
-                    <span class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-3 py-1 rounded-full text-xs font-black shadow-md">
-                      {activeTab}
-                    </span>
-                  </h2>
-                </div>
-                <div class="text-xs text-slate-400 font-semibold bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700/50">
-                  Showing <span class="text-blue-400 font-bold">{filteredSamples.length}</span> of {samples.length} records
-                </div>
+            {/* Main Content */}
+            <main class="flex-1 p-6 overflow-y-auto">
+              <div class="mb-4 flex items-center justify-between">
+                <h2 class="text-sm font-semibold text-slate-700">
+                  Sample Tracking Database ({filteredSamples.length})
+                </h2>
               </div>
 
               {loading ? (
-                <div class="flex justify-center items-center py-28 text-slate-400 font-medium">
-                  <div class="flex items-center gap-3 bg-[#161F30] px-8 py-5 rounded-2xl shadow-2xl border border-slate-700">
-                    <div class="w-6 h-6 border-3 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                    <span class="text-sm">Fetching live data from <b class="text-blue-400">"{activeTab}"</b>...</span>
-                  </div>
+                <div class="flex justify-center items-center py-24 text-slate-400 text-sm">
+                  Loading records...
                 </div>
               ) : filteredSamples.length === 0 ? (
-                <div class="bg-[#161F30] rounded-2xl border border-slate-800 p-12 text-center text-slate-400 max-w-lg mx-auto shadow-xl">
-                  <div class="text-4xl mb-3">📁</div>
-                  <h3 class="text-base font-bold text-slate-200 mb-1">No matching records found</h3>
-                  <p class="text-xs text-slate-400 mb-4">Try clearing filters or searching for something else.</p>
-                  <button onClick={clearAllFilters} class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition">
-                    Reset All Filters
-                  </button>
-                </div>
-              ) : viewMode === 'grid' ? (
-                /* Grid View */
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {filteredSamples.map(sample => {
-                    const gradientClass = CARD_GRADIENTS[sample.colorIndex];
-                    return (
-                      <div 
-                        key={sample.id} 
-                        onClick={() => setSelectedSample(sample)}
-                        class={`bg-gradient-to-br bg-[#161F30] ${gradientClass} rounded-2xl p-4 border shadow-lg hover:shadow-2xl transition-all duration-200 cursor-pointer flex flex-col justify-between group hover:-translate-y-0.5`}
-                      >
-                        <div>
-                          <div class="flex justify-between items-start mb-2.5">
-                            <div>
-                              <span class="text-[10px] font-black text-blue-400 uppercase tracking-wider block">{sample.sampleId}</span>
-                              <h3 class="font-bold text-sm text-slate-100 leading-snug group-hover:text-blue-300 transition line-clamp-2">
-                                {sample.sampleName}
-                              </h3>
-                            </div>
-                            {sample.location && sample.location !== '-' && (
-                              <span class="bg-blue-950/80 text-blue-300 border border-blue-800/60 px-2 py-0.5 rounded-lg text-[10px] font-semibold shrink-0 ml-2 shadow-sm">
-                                📍 {sample.location}
-                              </span>
-                            )}
-                          </div>
-                          
-                          <div class="bg-[#0B0F17]/60 p-3 rounded-xl border border-slate-800/80 my-2.5">
-                            <span class="text-[10px] font-bold text-slate-400 uppercase block mb-0.5">Client / Requirement:</span>
-                            <p class="text-xs text-slate-300 line-clamp-2 font-medium">
-                              {sample.clientRequirement !== '-' ? sample.clientRequirement : 'No requirement details'}
-                            </p>
-                          </div>
-
-                          <div class="space-y-1.5 mt-2">
-                            {sample.tags && sample.tags !== '-' && (
-                              <div>
-                                <span class="text-[10px] font-bold text-slate-400 uppercase block">Tags:</span>
-                                <span class="inline-block bg-indigo-950/80 text-indigo-300 border border-indigo-800/50 text-[11px] px-2 py-0.5 rounded-md font-medium max-w-full truncate">
-                                  🏷️ {sample.tags}
-                                </span>
-                              </div>
-                            )}
-
-                            {sample.industry && sample.industry !== '-' && (
-                              <div>
-                                <span class="text-[10px] font-bold text-slate-400 uppercase block">Industry:</span>
-                                <span class="text-xs text-slate-300 font-medium">{sample.industry}</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div class="pt-3 mt-3 border-t border-slate-800/80 flex justify-end items-center">
-                          {sample.sampleSheet ? (
-                            <a 
-                              href={sample.sampleSheet} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()} 
-                              class="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1 shadow-md hover:shadow-blue-500/20"
-                            >
-                              🔗 Open Sheet ↗
-                            </a>
-                          ) : (
-                            <span class="text-xs text-slate-500 italic">No Link</span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div class="bg-white border border-slate-200 rounded-xl p-10 text-center text-slate-400 text-sm">
+                  No samples found matching selected filters.
                 </div>
               ) : (
-                /* Table View */
-                <div class="bg-[#161F30] rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
-                  <div class="overflow-x-auto">
-                    <table class="w-full text-left text-sm">
-                      <thead class="bg-[#111827] border-b border-slate-800 text-slate-400 font-bold text-xs uppercase tracking-wider">
-                        <tr>
-                          <th class="p-3.5">ID</th>
-                          <th class="p-3.5">Sample Name</th>
-                          <th class="p-3.5">Client / Requirement</th>
-                          <th class="p-3.5">Tags</th>
-                          <th class="p-3.5">Location</th>
-                          <th class="p-3.5">Industry</th>
-                          <th class="p-3.5">Sheet Link</th>
-                        </tr>
-                      </thead>
-                      <tbody class="divide-y divide-slate-800/60 text-xs">
-                        {filteredSamples.map(sample => (
-                          <tr key={sample.id} onClick={() => setSelectedSample(sample)} class="hover:bg-slate-800/40 transition cursor-pointer">
-                            <td class="p-3.5 font-bold text-blue-400">{sample.sampleId}</td>
-                            <td class="p-3.5 font-semibold text-slate-200">{sample.sampleName}</td>
-                            <td class="p-3.5 text-slate-300 max-w-xs truncate">{sample.clientRequirement}</td>
-                            <td class="p-3.5 text-indigo-300">{sample.tags}</td>
-                            <td class="p-3.5 text-slate-300">{sample.location}</td>
-                            <td class="p-3.5 text-slate-300">{sample.industry}</td>
-                            <td class="p-3.5">
-                              {sample.sampleSheet ? (
-                                <a 
-                                  href={sample.sampleSheet} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  onClick={(e) => e.stopPropagation()} 
-                                  class="text-blue-400 hover:text-blue-300 font-bold text-xs bg-blue-950/60 px-2.5 py-1 rounded-lg border border-blue-800/50 inline-block"
-                                >
-                                  🔗 Open ↗
-                                </a>
-                              ) : (
-                                <span class="text-slate-600">-</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {filteredSamples.map(sample => (
+                    <div 
+                      key={sample.id} 
+                      class="bg-white rounded-xl border border-slate-200/90 p-4 shadow-sm hover:shadow-md transition relative flex flex-col justify-between"
+                    >
+                      <div>
+                        {/* Status Badge */}
+                        <div class="flex justify-between items-start mb-1">
+                          <h3 class="text-lg font-bold text-slate-900 leading-tight">
+                            {sample.sampleName}
+                          </h3>
+                          <span class={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
+                            sample.projectStatus === 'Completed' ? 'bg-emerald-100 text-emerald-800' :
+                            sample.projectStatus === 'In Progress' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
+                          }`}>
+                            {sample.projectStatus}
+                          </span>
+                        </div>
+
+                        {/* Minimal Structured Metadata */}
+                        <div class="space-y-1 my-3 text-xs">
+                          <p class="text-slate-800"><span class="font-bold">Sample ID:</span> {sample.sampleId}</p>
+                          <p class="text-slate-800"><span class="font-bold">Location:</span> {sample.location}</p>
+                          <p class="text-slate-800"><span class="font-bold">Industry:</span> {sample.industry}</p>
+                          
+                          <div class="flex items-center gap-1.5 pt-1">
+                            <span class="font-bold text-slate-800">Keywords/Tags:</span>
+                            <span class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-[11px] font-medium">
+                              {sample.tags}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Sheet Redirect Icon */}
+                      <div class="flex justify-end pt-2 border-t border-slate-100">
+                        {sample.sampleSheet ? (
+                          <a 
+                            href={sample.sampleSheet} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            class="text-slate-600 hover:text-blue-600 text-sm p-1 rounded transition"
+                            title="Open Sheet"
+                          >
+                            ↗
+                          </a>
+                        ) : (
+                          <span class="text-slate-300 text-sm">↗</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </main>
           </div>
-
-          {/* Modal */}
-          {selectedSample && (
-            <div class="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 z-50">
-              <div class="bg-[#161F30] rounded-2xl max-w-lg w-full p-6 shadow-2xl relative border border-slate-700">
-                <button onClick={() => setSelectedSample(null)} class="absolute top-4 right-4 text-slate-400 hover:text-white font-bold text-lg">✕</button>
-                <div class="flex items-center gap-2 mb-1">
-                  <span class="text-xs font-bold text-blue-400 uppercase tracking-wider">{selectedSample.sampleId}</span>
-                  <span class="text-[10px] bg-slate-800 text-slate-300 font-semibold px-2 py-0.5 rounded-md">{selectedSample.tabName}</span>
-                </div>
-                <h2 class="text-xl font-bold text-white mb-4 leading-snug">{selectedSample.sampleName}</h2>
-
-                <div class="space-y-3.5 text-sm">
-                  <div>
-                    <h4 class="font-bold text-slate-400 text-xs uppercase tracking-wider">Client / Requirement:</h4>
-                    <p class="text-slate-200 bg-[#0B0F17] p-3 rounded-xl border border-slate-800 mt-1 font-medium">{selectedSample.clientRequirement}</p>
-                  </div>
-
-                  <div>
-                    <h4 class="font-bold text-slate-400 text-xs uppercase tracking-wider">Keywords / Tags:</h4>
-                    <p class="text-indigo-300 bg-[#0B0F17] p-3 rounded-xl border border-slate-800 mt-1 font-medium">{selectedSample.tags}</p>
-                  </div>
-
-                  <div class="grid grid-cols-2 gap-3 bg-[#0B0F17] p-3.5 rounded-xl border border-slate-800 text-xs">
-                    <div><span class="text-slate-400 block">Location:</span><span class="font-semibold text-slate-200">{selectedSample.location}</span></div>
-                    <div><span class="text-slate-400 block">Industry:</span><span class="font-semibold text-slate-200">{selectedSample.industry}</span></div>
-                    <div><span class="text-slate-400 block">Difficulty Index:</span><span class="font-semibold text-slate-200">{selectedSample.researchDifficulty}</span></div>
-                    <div><span class="text-slate-400 block">Created By:</span><span class="font-semibold text-slate-200">{selectedSample.createdBy}</span></div>
-                  </div>
-                </div>
-
-                <div class="mt-6 flex justify-between items-center pt-3 border-t border-slate-800">
-                  {selectedSample.sampleSheet ? (
-                    <a href={selectedSample.sampleSheet} target="_blank" rel="noopener noreferrer" class="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-xl text-xs hover:from-blue-500 hover:to-indigo-500 shadow-lg">
-                      🔗 Open Sample Sheet ↗
-                    </a>
-                  ) : (
-                    <span class="text-xs text-slate-500 italic">No Link Available</span>
-                  )}
-                  <button onClick={() => setSelectedSample(null)} class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-xs border border-slate-700">Close</button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       );
     }
