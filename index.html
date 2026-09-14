@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Multi-Tab Sample Tracking Dashboard</title>
+  <title>Sample Tracking Master Dashboard</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- React & ReactDOM -->
@@ -45,6 +45,7 @@
       const [selectedLocations, setSelectedLocations] = useState([]);
       const [selectedSample, setSelectedSample] = useState(null);
       const [viewMode, setViewMode] = useState("grid");
+      const [errorMsg, setErrorMsg] = useState("");
 
       useEffect(() => {
         fetchSheetData(activeTab);
@@ -58,10 +59,14 @@
 
       const fetchSheetData = (tabName) => {
         setLoading(true);
-        // Multi-fallback CSV URL structure
-        const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabName)}&headers=1`;
+        setErrorMsg("");
 
-        Papa.parse(csvUrl, {
+        // Multi-proxy endpoints to ensure zero CORS/Empty issue
+        const encodedTab = encodeURIComponent(tabName);
+        const gvizUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodedTab}`;
+        const corsProxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(gvizUrl)}`;
+
+        Papa.parse(corsProxyUrl, {
           download: true,
           header: false,
           skipEmptyLines: 'greedy',
@@ -69,19 +74,17 @@
             if (results.data && results.data.length > 0) {
               parseRows(results.data, tabName);
             } else {
-              // Try secondary export URL
-              fetchFallback(tabName);
+              tryDirectFetch(gvizUrl, tabName);
             }
           },
           error: () => {
-            fetchFallback(tabName);
+            tryDirectFetch(gvizUrl, tabName);
           }
         });
       };
 
-      const fetchFallback = (tabName) => {
-        const fallbackUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&sheet=${encodeURIComponent(tabName)}`;
-        Papa.parse(fallbackUrl, {
+      const tryDirectFetch = (gvizUrl, tabName) => {
+        Papa.parse(gvizUrl, {
           download: true,
           header: false,
           skipEmptyLines: 'greedy',
@@ -91,20 +94,21 @@
             } else {
               setSamples([]);
               setLoading(false);
+              setErrorMsg("No records found in this sheet tab.");
             }
           },
-          error: () => {
+          error: (err) => {
             setSamples([]);
             setLoading(false);
+            setErrorMsg("Could not load sheet data. Make sure 'Publish to Web' is enabled in Google Sheets.");
           }
         });
       };
 
       const parseRows = (rawRows, tabName) => {
-        // Remove empty header or title rows if present
         let rowsToProcess = rawRows;
-        
-        // Detect if first row contains headers
+
+        // Skip header row if matches sample columns
         let startIndex = 0;
         if (rowsToProcess[0] && rowsToProcess[0].some(cell => {
           const str = String(cell).toLowerCase();
@@ -285,12 +289,16 @@
                 <div class="flex justify-center items-center py-20 text-slate-500 font-medium">
                   <div class="flex items-center gap-3 bg-white px-6 py-4 rounded-xl shadow-sm border border-slate-200">
                     <div class="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                    <span>Loading data from <b>"{activeTab}"</b>...</span>
+                    <span>Fetching live data from <b>"{activeTab}"</b>...</span>
                   </div>
+                </div>
+              ) : errorMsg ? (
+                <div class="bg-red-50 border border-red-200 text-red-700 rounded-xl p-6 text-center text-sm">
+                  ⚠️ {errorMsg}
                 </div>
               ) : filteredSamples.length === 0 ? (
                 <div class="bg-white rounded-xl border border-slate-200 p-10 text-center text-slate-500">
-                  📂 No records found in <b>"{activeTab}"</b>.
+                  📁 No matching records found in <b>"{activeTab}"</b>.
                 </div>
               ) : viewMode === 'grid' ? (
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
