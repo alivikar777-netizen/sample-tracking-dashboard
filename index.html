@@ -22,19 +22,20 @@
 
     const SHEET_ID = "142xiSUpVUdMGkFkzvyFBCPp5M0J_0AtAdHlCsCUWqkg";
 
+    // Tab configuration with exact names and fallback GID support
     const SHEET_TABS = [
-      "All Samples",
-      "Government Contract Sample",
-      "Exhibitor & Attendee Samples",
-      "EXhibitior Count",
-      "Business Email List Samples",
-      "Funding Samples",
-      "Location Wise Email List",
-      "Doctors - Specialist Email List",
-      "Industry Email List",
-      "Title Email List",
-      "Technology Users Email List",
-      "E-Commerce Samples"
+      { name: "All Samples", gid: "807215490" },
+      { name: "Government Contract Sample", gid: "0" },
+      { name: "Exhibitor & Attendee Samples", gid: "1" },
+      { name: "EXhibitior Count", gid: "2" },
+      { name: "Business Email List Samples", gid: "3" },
+      { name: "Funding Samples", gid: "4" },
+      { name: "Location Wise Email List", gid: "5" },
+      { name: "Doctors - Specialist Email List", gid: "6" },
+      { name: "Industry Email List", gid: "7" },
+      { name: "Title Email List", gid: "8" },
+      { name: "Technology Users Email List", gid: "9" },
+      { name: "E-Commerce Samples", gid: "10" }
     ];
 
     function App() {
@@ -56,10 +57,10 @@
         return match ? match[0] : (String(str).startsWith('http') ? str : '');
       };
 
-      const fetchSheetData = (tabName) => {
+      const fetchSheetData = (tabObj) => {
         setLoading(true);
-        // Fetch CSV by Sheet Tab Name
-        const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabName)}`;
+        // Direct CSV Export URL using sheet name & GID
+        const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabObj.name)}`;
 
         Papa.parse(csvUrl, {
           download: true,
@@ -67,60 +68,82 @@
           skipEmptyLines: true,
           complete: (results) => {
             if (results.data && results.data.length > 0) {
-              const rawRows = results.data;
-              
-              // Find header index or skip first row if it looks like header
-              let startIndex = 0;
-              if (rawRows[0] && rawRows[0].some(cell => String(cell).toLowerCase().includes('sample') || String(cell).toLowerCase().includes('name') || String(cell).toLowerCase().includes('client'))) {
-                startIndex = 1;
-              }
+              parseRows(results.data, tabObj.name);
+            } else {
+              // Fallback to GID export if sheet name mode returns empty
+              fetchByGid(tabObj);
+            }
+          },
+          error: () => {
+            fetchByGid(tabObj);
+          }
+        });
+      };
 
-              const formatted = rawRows.slice(startIndex).map((row, idx) => {
-                // Generic Column Mapper (Index-based with fallback search)
-                const sampleId = row[0] ? String(row[0]).trim() : `SMP-${idx + 1}`;
-                const project = row[1] ? String(row[1]).trim() : 'Yes';
-                const date = row[2] ? String(row[2]).trim() : '';
-                const sampleName = row[3] ? String(row[3]).trim() : `Record ${idx + 1}`;
-                const rawSheetUrl = row[4] ? String(row[4]).trim() : '';
-                const clientReq = row[5] ? String(row[5]).trim() : '-';
-                const difficulty = row[6] ? String(row[6]).trim() : '-';
-                const createdBy = row[7] ? String(row[7]).trim() : '-';
-                const tags = row[8] ? String(row[8]).trim() : '-';
-                const industry = row[9] ? String(row[9]).trim() : '-';
-                const location = row[10] ? String(row[10]).trim() : '-';
-
-                return {
-                  id: `${tabName}-${idx}`,
-                  sampleId,
-                  project,
-                  date,
-                  sampleName,
-                  sampleSheet: extractUrl(rawSheetUrl),
-                  clientRequirement: clientReq,
-                  researchDifficulty: difficulty,
-                  createdBy,
-                  tags,
-                  industry,
-                  location,
-                  tabName
-                };
-              });
-
-              setSamples(formatted);
+      const fetchByGid = (tabObj) => {
+        const fallbackUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${tabObj.gid}`;
+        Papa.parse(fallbackUrl, {
+          download: true,
+          header: false,
+          skipEmptyLines: true,
+          complete: (results) => {
+            if (results.data && results.data.length > 0) {
+              parseRows(results.data, tabObj.name);
             } else {
               setSamples([]);
+              setLoading(false);
             }
-            setLoading(false);
           },
-          error: (err) => {
-            console.error("CSV Fetch Error:", err);
+          error: () => {
             setSamples([]);
             setLoading(false);
           }
         });
       };
 
-      // Get unique locations dynamically from current loaded sheet data
+      const parseRows = (rawRows, tabName) => {
+        let startIndex = 0;
+        if (rawRows[0] && rawRows[0].some(cell => {
+          const str = String(cell).toLowerCase();
+          return str.includes('sample') || str.includes('name') || str.includes('client') || str.includes('id');
+        })) {
+          startIndex = 1;
+        }
+
+        const formatted = rawRows.slice(startIndex).map((row, idx) => {
+          const sampleId = row[0] ? String(row[0]).trim() : `SMP-${idx + 1}`;
+          const project = row[1] ? String(row[1]).trim() : 'Yes';
+          const date = row[2] ? String(row[2]).trim() : '';
+          const sampleName = row[3] ? String(row[3]).trim() : `Record ${idx + 1}`;
+          const rawSheetUrl = row[4] ? String(row[4]).trim() : '';
+          const clientReq = row[5] ? String(row[5]).trim() : '-';
+          const difficulty = row[6] ? String(row[6]).trim() : '-';
+          const createdBy = row[7] ? String(row[7]).trim() : '-';
+          const tags = row[8] ? String(row[8]).trim() : '-';
+          const industry = row[9] ? String(row[9]).trim() : '-';
+          const location = row[10] ? String(row[10]).trim() : '-';
+
+          return {
+            id: `${tabName}-${idx}`,
+            sampleId,
+            project,
+            date,
+            sampleName,
+            sampleSheet: extractUrl(rawSheetUrl),
+            clientRequirement: clientReq,
+            researchDifficulty: difficulty,
+            createdBy,
+            tags,
+            industry,
+            location,
+            tabName
+          };
+        });
+
+        setSamples(formatted);
+        setLoading(false);
+      };
+
       const availableLocations = useMemo(() => {
         const locs = new Set();
         samples.forEach(s => {
@@ -156,7 +179,7 @@
 
       return (
         <div class="min-h-screen flex flex-col bg-slate-100">
-          {/* Main Top Header */}
+          {/* Header */}
           <header class="bg-slate-900 text-white sticky top-0 z-20 px-6 py-3 flex flex-wrap items-center justify-between gap-4 shadow-md">
             <div class="flex items-center space-x-3">
               <div class="p-2 bg-blue-600 text-white rounded-lg font-bold text-lg">ST</div>
@@ -166,7 +189,6 @@
               </div>
             </div>
 
-            {/* Search Input */}
             <div class="flex-1 max-w-lg">
               <input
                 type="text"
@@ -177,7 +199,6 @@
               />
             </div>
 
-            {/* Actions */}
             <div class="flex items-center space-x-3">
               <button onClick={() => fetchSheetData(activeTab)} class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium border border-slate-700 flex items-center gap-1 transition">
                 🔄 {loading ? 'Syncing...' : 'Sync Sheet'}
@@ -188,17 +209,17 @@
             </div>
           </header>
 
-          {/* 12 Tabs Scrollable Navigation Bar */}
-          <div class="bg-white border-b border-slate-200 px-6 pt-2 pb-0 overflow-x-auto whitespace-nowrap shadow-sm scrollbar-none">
+          {/* Tab Navigation */}
+          <div class="bg-white border-b border-slate-200 px-6 pt-2 pb-0 overflow-x-auto whitespace-nowrap shadow-sm">
             <div class="flex space-x-2">
               {SHEET_TABS.map((tab) => {
-                const isActive = activeTab === tab;
+                const isActive = activeTab.name === tab.name;
                 return (
                   <button
-                    key={tab}
+                    key={tab.name}
                     onClick={() => {
                       setActiveTab(tab);
-                      setSelectedLocations([]); // Reset filter on tab change
+                      setSelectedLocations([]);
                     }}
                     class={`px-4 py-2.5 rounded-t-lg text-xs font-bold transition flex items-center gap-2 border-b-2 ${
                       isActive 
@@ -207,7 +228,7 @@
                     }`}
                   >
                     <span>📁</span>
-                    <span>{tab}</span>
+                    <span>{tab.name}</span>
                   </button>
                 );
               })}
@@ -215,7 +236,7 @@
           </div>
 
           <div class="flex flex-1">
-            {/* Sidebar Filters */}
+            {/* Sidebar */}
             <aside class="w-64 bg-white border-r border-slate-200 p-4 shrink-0 hidden md:block">
               <div class="mb-6">
                 <div class="flex justify-between items-center mb-2">
@@ -245,13 +266,13 @@
               </div>
             </aside>
 
-            {/* Main Content */}
+            {/* Content */}
             <main class="flex-1 p-6">
               <div class="mb-4 flex flex-wrap justify-between items-center gap-2">
                 <div>
                   <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
                     <span>Active Tab:</span>
-                    <span class="bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full text-xs font-extrabold">{activeTab}</span>
+                    <span class="bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full text-xs font-extrabold">{activeTab.name}</span>
                   </h2>
                   <p class="text-xs text-slate-500 mt-0.5">Showing {filteredSamples.length} records</p>
                 </div>
@@ -261,12 +282,12 @@
                 <div class="flex justify-center items-center py-20 text-slate-500 font-medium">
                   <div class="flex items-center gap-3 bg-white px-6 py-4 rounded-xl shadow-sm border border-slate-200">
                     <div class="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                    <span>Loading data from <b>"{activeTab}"</b>...</span>
+                    <span>Loading data from <b>"{activeTab.name}"</b>...</span>
                   </div>
                 </div>
               ) : filteredSamples.length === 0 ? (
                 <div class="bg-white rounded-xl border border-slate-200 p-10 text-center text-slate-500">
-                  📂 No records found in <b>"{activeTab}"</b> matching your search/filters.
+                  📂 No records found in <b>"{activeTab.name}"</b> matching your search/filters.
                 </div>
               ) : viewMode === 'grid' ? (
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -277,7 +298,6 @@
                       class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm hover:shadow-md transition cursor-pointer flex flex-col justify-between hover:border-blue-400 group"
                     >
                       <div>
-                        {/* Card Header */}
                         <div class="flex justify-between items-start mb-2">
                           <div>
                             <span class="text-[10px] font-bold text-blue-600 uppercase tracking-wide block">{sample.sampleId}</span>
@@ -290,7 +310,6 @@
                           )}
                         </div>
                         
-                        {/* Client / Requirement Box */}
                         <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-100 my-2">
                           <span class="text-[10px] font-bold text-slate-400 uppercase block">Client / Requirement:</span>
                           <p class="text-xs text-slate-700 line-clamp-2 font-medium">
@@ -298,7 +317,6 @@
                           </p>
                         </div>
 
-                        {/* Keywords / Tags & Industry */}
                         <div class="space-y-1 mt-2">
                           {sample.tags && sample.tags !== '-' && (
                             <div>
@@ -318,7 +336,6 @@
                         </div>
                       </div>
 
-                      {/* Card Footer */}
                       <div class="pt-3 mt-3 border-t border-slate-100 flex justify-end items-center">
                         {sample.sampleSheet ? (
                           <a 
@@ -338,7 +355,6 @@
                   ))}
                 </div>
               ) : (
-                /* Table View */
                 <div class="bg-white rounded-xl border border-slate-200 overflow-x-auto shadow-sm">
                   <table class="w-full text-left text-sm">
                     <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold text-xs uppercase">
@@ -385,7 +401,7 @@
             </main>
           </div>
 
-          {/* Sample Detail Modal */}
+          {/* Modal */}
           {selectedSample && (
             <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
               <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative border border-slate-100">
