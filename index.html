@@ -11,7 +11,7 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <!-- Babel -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <!-- PapaParse for CSV -->
+  <!-- PapaParse -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 </head>
 <body class="bg-slate-100 text-slate-800 antialiased font-sans">
@@ -22,20 +22,19 @@
 
     const SHEET_ID = "142xiSUpVUdMGkFkzvyFBCPp5M0J_0AtAdHlCsCUWqkg";
 
-    // Tab configuration with exact names and fallback GID support
     const SHEET_TABS = [
-      { name: "All Samples", gid: "807215490" },
-      { name: "Government Contract Sample", gid: "0" },
-      { name: "Exhibitor & Attendee Samples", gid: "1" },
-      { name: "EXhibitior Count", gid: "2" },
-      { name: "Business Email List Samples", gid: "3" },
-      { name: "Funding Samples", gid: "4" },
-      { name: "Location Wise Email List", gid: "5" },
-      { name: "Doctors - Specialist Email List", gid: "6" },
-      { name: "Industry Email List", gid: "7" },
-      { name: "Title Email List", gid: "8" },
-      { name: "Technology Users Email List", gid: "9" },
-      { name: "E-Commerce Samples", gid: "10" }
+      "All Samples",
+      "Government Contract Sample",
+      "Exhibitor & Attendee Samples",
+      "EXhibitior Count",
+      "Business Email List Samples",
+      "Funding Samples",
+      "Location Wise Email List",
+      "Doctors - Specialist Email List",
+      "Industry Email List",
+      "Title Email List",
+      "Technology Users Email List",
+      "E-Commerce Samples"
     ];
 
     function App() {
@@ -57,38 +56,38 @@
         return match ? match[0] : (String(str).startsWith('http') ? str : '');
       };
 
-      const fetchSheetData = (tabObj) => {
+      const fetchSheetData = (tabName) => {
         setLoading(true);
-        // Direct CSV Export URL using sheet name & GID
-        const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabObj.name)}`;
+        // Multi-fallback CSV URL structure
+        const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabName)}&headers=1`;
 
         Papa.parse(csvUrl, {
           download: true,
           header: false,
-          skipEmptyLines: true,
+          skipEmptyLines: 'greedy',
           complete: (results) => {
             if (results.data && results.data.length > 0) {
-              parseRows(results.data, tabObj.name);
+              parseRows(results.data, tabName);
             } else {
-              // Fallback to GID export if sheet name mode returns empty
-              fetchByGid(tabObj);
+              // Try secondary export URL
+              fetchFallback(tabName);
             }
           },
           error: () => {
-            fetchByGid(tabObj);
+            fetchFallback(tabName);
           }
         });
       };
 
-      const fetchByGid = (tabObj) => {
-        const fallbackUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${tabObj.gid}`;
+      const fetchFallback = (tabName) => {
+        const fallbackUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&sheet=${encodeURIComponent(tabName)}`;
         Papa.parse(fallbackUrl, {
           download: true,
           header: false,
-          skipEmptyLines: true,
+          skipEmptyLines: 'greedy',
           complete: (results) => {
             if (results.data && results.data.length > 0) {
-              parseRows(results.data, tabObj.name);
+              parseRows(results.data, tabName);
             } else {
               setSamples([]);
               setLoading(false);
@@ -102,19 +101,23 @@
       };
 
       const parseRows = (rawRows, tabName) => {
+        // Remove empty header or title rows if present
+        let rowsToProcess = rawRows;
+        
+        // Detect if first row contains headers
         let startIndex = 0;
-        if (rawRows[0] && rawRows[0].some(cell => {
+        if (rowsToProcess[0] && rowsToProcess[0].some(cell => {
           const str = String(cell).toLowerCase();
-          return str.includes('sample') || str.includes('name') || str.includes('client') || str.includes('id');
+          return str.includes('sample') || str.includes('name') || str.includes('client') || str.includes('id') || str.includes('req');
         })) {
           startIndex = 1;
         }
 
-        const formatted = rawRows.slice(startIndex).map((row, idx) => {
+        const formatted = rowsToProcess.slice(startIndex).filter(row => row.some(cell => String(cell).trim() !== '')).map((row, idx) => {
           const sampleId = row[0] ? String(row[0]).trim() : `SMP-${idx + 1}`;
           const project = row[1] ? String(row[1]).trim() : 'Yes';
           const date = row[2] ? String(row[2]).trim() : '';
-          const sampleName = row[3] ? String(row[3]).trim() : `Record ${idx + 1}`;
+          const sampleName = row[3] ? String(row[3]).trim() : (row[0] ? String(row[0]).trim() : `Record ${idx + 1}`);
           const rawSheetUrl = row[4] ? String(row[4]).trim() : '';
           const clientReq = row[5] ? String(row[5]).trim() : '-';
           const difficulty = row[6] ? String(row[6]).trim() : '-';
@@ -209,14 +212,14 @@
             </div>
           </header>
 
-          {/* Tab Navigation */}
+          {/* Tab Navigation Bar */}
           <div class="bg-white border-b border-slate-200 px-6 pt-2 pb-0 overflow-x-auto whitespace-nowrap shadow-sm">
             <div class="flex space-x-2">
               {SHEET_TABS.map((tab) => {
-                const isActive = activeTab.name === tab.name;
+                const isActive = activeTab === tab;
                 return (
                   <button
-                    key={tab.name}
+                    key={tab}
                     onClick={() => {
                       setActiveTab(tab);
                       setSelectedLocations([]);
@@ -228,7 +231,7 @@
                     }`}
                   >
                     <span>📁</span>
-                    <span>{tab.name}</span>
+                    <span>{tab}</span>
                   </button>
                 );
               })}
@@ -272,7 +275,7 @@
                 <div>
                   <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
                     <span>Active Tab:</span>
-                    <span class="bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full text-xs font-extrabold">{activeTab.name}</span>
+                    <span class="bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full text-xs font-extrabold">{activeTab}</span>
                   </h2>
                   <p class="text-xs text-slate-500 mt-0.5">Showing {filteredSamples.length} records</p>
                 </div>
@@ -282,12 +285,12 @@
                 <div class="flex justify-center items-center py-20 text-slate-500 font-medium">
                   <div class="flex items-center gap-3 bg-white px-6 py-4 rounded-xl shadow-sm border border-slate-200">
                     <div class="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                    <span>Loading data from <b>"{activeTab.name}"</b>...</span>
+                    <span>Loading data from <b>"{activeTab}"</b>...</span>
                   </div>
                 </div>
               ) : filteredSamples.length === 0 ? (
                 <div class="bg-white rounded-xl border border-slate-200 p-10 text-center text-slate-500">
-                  📂 No records found in <b>"{activeTab.name}"</b> matching your search/filters.
+                  📂 No records found in <b>"{activeTab}"</b>.
                 </div>
               ) : viewMode === 'grid' ? (
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
