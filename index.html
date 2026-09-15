@@ -53,26 +53,6 @@
       "E-Commerce Samples"
     ];
 
-    // Specific List requested for Doctors - Specialist Email List
-    const DOCTORS_SPECIALIST_LIST = [
-      { name: "Optometrist Email List", url: "https://docs.google.com/spreadsheets/d/142xiSUpVUdMGkFkzvyFBCPp5M0J_0AtAdHlCsCUWqkg/edit#gid=1564292089" },
-      { name: "Pediatrician Email List", url: "https://docs.google.com/spreadsheets/d/142xiSUpVUdMGkFkzvyFBCPp5M0J_0AtAdHlCsCUWqkg/edit#gid=1564292089" },
-      { name: "Podiatrists Email List", url: "https://docs.google.com/spreadsheets/d/142xiSUpVUdMGkFkzvyFBCPp5M0J_0AtAdHlCsCUWqkg/edit#gid=1564292089" },
-      { name: "Dermatologist Email List", url: "https://docs.google.com/spreadsheets/d/142xiSUpVUdMGkFkzvyFBCPp5M0J_0AtAdHlCsCUWqkg/edit#gid=1564292089" },
-      { name: "Dental Email List", url: "https://docs.google.com/spreadsheets/d/142xiSUpVUdMGkFkzvyFBCPp5M0J_0AtAdHlCsCUWqkg/edit#gid=1564292089" },
-      { name: "Cardiologist Email List", url: "https://docs.google.com/spreadsheets/d/142xiSUpVUdMGkFkzvyFBCPp5M0J_0AtAdHlCsCUWqkg/edit#gid=1564292089" },
-      { name: "Gynecologist Email List", url: "https://docs.google.com/spreadsheets/d/142xiSUpVUdMGkFkzvyFBCPp5M0J_0AtAdHlCsCUWqkg/edit#gid=1564292089" },
-      { name: "Neurologists Email List", url: "https://docs.google.com/spreadsheets/d/142xiSUpVUdMGkFkzvyFBCPp5M0J_0AtAdHlCsCUWqkg/edit#gid=1564292089" },
-      { name: "Physician Email List", url: "https://docs.google.com/spreadsheets/d/142xiSUpVUdMGkFkzvyFBCPp5M0J_0AtAdHlCsCUWqkg/edit#gid=1564292089" },
-      { name: "General Surgeon Email List", url: "https://docs.google.com/spreadsheets/d/1Qy6Dr9ZRVX7jLOSA7RInVh9IR60azNm8SLghW8YpjF8/edit?gid=1564292089" },
-      { name: "Anesthesiologist Email List", url: "https://docs.google.com/spreadsheets/d/1LeViVd3s7wrHD3DEA4ggEb0roThxbHjPAA8oz_CatFU/edit?gid=1564292089" },
-      { name: "Endocrinologist Email List", url: "https://docs.google.com/spreadsheets/d/1je9LaztidmbQ8qJo9NAXIGrOeriaV9ERh5Ln4BKKaYU/edit?gid=1564292089" },
-      { name: "Rheumatologist Email List", url: "https://docs.google.com/spreadsheets/d/1abSb4QffbLqE3v2oSgllHSKBJzd1qqPilWGo-IWSVkI/edit?gid=580190905" },
-      { name: "Urologists Email List", url: "https://docs.google.com/spreadsheets/d/136O_i0eQrcPK5h0hi5bDBsaZcEmeRXXpoww08GxWWYM/edit?gid=1564292089" },
-      { name: "Pathologists email list", url: "https://docs.google.com/spreadsheets/d/1mP8byKzGhXA_BwySPQEXdona9FtHs6yIrBVpG8zTwes/edit?gid=1564292089" },
-      { name: "Pulmonologists Email List", url: "https://docs.google.com/spreadsheets/d/1phGzCW4YGkohfodTzrNVvOhR0uA7lj4p6Kov4txwdSQ/edit?gid=1564292089" }
-    ];
-
     function App() {
       const [activeTab, setActiveTab] = useState(SHEET_TABS[0]);
       const [allTabsData, setAllTabsData] = useState({});
@@ -124,22 +104,6 @@
         return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`;
       };
 
-      const getDoctorsExactData = () => {
-        return DOCTORS_SPECIALIST_LIST.map((item, idx) => ({
-          id: `Doctors - Specialist Email List-${idx}`,
-          tabName: "Doctors - Specialist Email List",
-          sampleId: item.name,
-          sampleName: item.name,
-          sampleSheet: item.url,
-          clientRequirement: "",
-          tags: "",
-          industry: "",
-          location: "",
-          projectStatus: 'Completed',
-          isSimpleTwoColumn: true
-        }));
-      };
-
       const fetchAllTabsData = () => {
         setLoading(true);
         const cacheBuster = new Date().getTime();
@@ -147,16 +111,6 @@
         let fetchCount = 0;
 
         SHEET_TABS.forEach(tabName => {
-          if (tabName === "Doctors - Specialist Email List") {
-            loadedData[tabName] = getDoctorsExactData();
-            fetchCount++;
-            if (fetchCount === SHEET_TABS.length) {
-              setAllTabsData(loadedData);
-              setLoading(false);
-            }
-            return;
-          }
-
           const sheetParam = `&sheet=${encodeURIComponent(tabName)}`;
           const gvizUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv${sheetParam}&_=${cacheBuster}`;
 
@@ -194,6 +148,7 @@
         let headerIndex = -1;
         let colMap = { id: -1, name: -1, url: -1, clientReq: -1, tags: -1, industry: -1, location: -1 };
 
+        // Header detection logic
         for (let i = 0; i < Math.min(10, rawRows.length); i++) {
           const rowStr = rawRows[i].map(c => String(c).toLowerCase()).join(' ');
           if (rowStr.includes('sample') || rowStr.includes('name') || rowStr.includes('location') || rowStr.includes('link') || rowStr.includes('url') || rowStr.includes('title')) {
@@ -217,34 +172,43 @@
         const startIndex = headerIndex >= 0 ? headerIndex + 1 : 0;
         const targetRows = rawRows.slice(startIndex);
 
-        return targetRows.filter(row => row.some(cell => String(cell).trim() !== '')).map((row, idx) => {
-          const getVal = (colIdx) => (colIdx >= 0 && row[colIdx]) ? String(row[colIdx]).trim() : '';
+        return targetRows
+          .filter(row => row.some(cell => String(cell).trim() !== ''))
+          .map((row, idx) => {
+            const getVal = (colIdx) => (colIdx >= 0 && row[colIdx]) ? String(row[colIdx]).trim() : '';
 
-          const rawName = getVal(colMap.name) || (row[0] && !String(row[0]).includes('http') ? String(row[0]).trim() : `Sample Record ${idx + 1}`);
-          const sampleId = getVal(colMap.id) || rawName;
-          
-          let rawSheetUrl = getVal(colMap.url);
-          if (!rawSheetUrl || !rawSheetUrl.includes('http')) {
-            const foundUrlCell = row.find(c => String(c).includes('http') || String(c).includes('docs.google.com') || String(c).includes('spreadsheets'));
-            if (foundUrlCell) {
-              rawSheetUrl = String(foundUrlCell);
+            let rawName = getVal(colMap.name);
+            if (!rawName) {
+              const nonUrlCell = row.find(c => String(c).trim() !== '' && !String(c).includes('http') && !String(c).includes('docs.google.com'));
+              rawName = nonUrlCell ? String(nonUrlCell).trim() : `Sample Record ${idx + 1}`;
             }
-          }
 
-          return {
-            id: `${tabName}-${idx}`,
-            tabName: tabName,
-            sampleId,
-            sampleName: rawName,
-            sampleSheet: cleanUrl(rawSheetUrl),
-            clientRequirement: getVal(colMap.clientReq),
-            tags: getVal(colMap.tags),
-            industry: getVal(colMap.industry),
-            location: getVal(colMap.location),
-            projectStatus: 'Completed',
-            isSimpleTwoColumn: false
-          };
-        });
+            const sampleId = getVal(colMap.id) || rawName;
+            
+            let rawSheetUrl = getVal(colMap.url);
+            if (!rawSheetUrl || !rawSheetUrl.includes('http')) {
+              const foundUrlCell = row.find(c => String(c).includes('http') || String(c).includes('docs.google.com') || String(c).includes('spreadsheets'));
+              if (foundUrlCell) {
+                rawSheetUrl = String(foundUrlCell);
+              }
+            }
+
+            const isDoctorsTab = tabName === "Doctors - Specialist Email List";
+
+            return {
+              id: `${tabName}-${idx}`,
+              tabName: tabName,
+              sampleId,
+              sampleName: rawName,
+              sampleSheet: cleanUrl(rawSheetUrl),
+              clientRequirement: getVal(colMap.clientReq),
+              tags: getVal(colMap.tags),
+              industry: getVal(colMap.industry),
+              location: getVal(colMap.location),
+              projectStatus: 'Completed',
+              isSimpleTwoColumn: isDoctorsTab
+            };
+          });
       };
 
       const currentScopeSamples = useMemo(() => {
@@ -385,7 +349,7 @@
             </div>
           </header>
 
-          {/* 12 Tabs Bar */}
+          {/* Tabs Bar */}
           <div class="bg-white border-b border-slate-200 px-6 overflow-x-auto whitespace-nowrap shadow-2xs">
             <div class="flex space-x-1 py-1">
               {SHEET_TABS.map((tab) => {
@@ -653,7 +617,7 @@
                           </h3>
                         </div>
 
-                        {/* Search Source Tab Label (visible when searching across all tabs) */}
+                        {/* Search Source Tab Label */}
                         {globalSearch.trim() !== "" && (
                           <div class="mb-2">
                             <span class="bg-slate-100 text-slate-600 text-[10px] font-semibold px-2 py-0.5 rounded">
@@ -662,7 +626,7 @@
                           </div>
                         )}
 
-                        {/* Multi-column Detail Fields (Only show for standard multi-column tabs) */}
+                        {/* Detail Fields for Multi-Column Tabs */}
                         {!sample.isSimpleTwoColumn && (
                           <div class="space-y-1 my-3 text-xs">
                             {sample.sampleId && <p class="text-slate-800"><span class="font-bold">Sample ID:</span> {sample.sampleId}</p>}
