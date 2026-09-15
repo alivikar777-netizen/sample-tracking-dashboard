@@ -94,37 +94,27 @@
         return num.toString();
       };
 
-      const extractUrl = (str) => {
-        if (!str) return '';
-        const match = String(str).match(/https?:\/\/[^\s"']+/);
-        return match ? match[0] : (String(str).startsWith('http') ? str : '');
+      // Fix URL Formatting issue (prevents internal Vercel redirecting)
+      const cleanUrl = (rawStr) => {
+        if (!rawStr) return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`;
+        let str = String(rawStr).trim();
+        const urlMatch = str.match(/https?:\/\/[^\s"']+/);
+        if (urlMatch) return urlMatch[0];
+        if (str.includes('docs.google.com') || str.includes('http')) {
+          if (!str.startsWith('http')) return 'https://' + str;
+          return str;
+        }
+        return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`;
       };
 
       const fetchSheetData = (tabName) => {
         setLoading(true);
         const cacheBuster = new Date().getTime();
         
-        // Fetch specific tab data using encoded sheet parameter & fallback query
-        const encodedTab = encodeURIComponent(tabName);
-        const gvizUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodedTab}&_=${cacheBuster}`;
-        const corsProxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(gvizUrl)}`;
+        // Fast direct fetching using gviz endpoint
+        const sheetParam = tabName === "All Samples" ? "" : `&sheet=${encodeURIComponent(tabName)}`;
+        const gvizUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv${sheetParam}&_=${cacheBuster}`;
 
-        Papa.parse(corsProxyUrl, {
-          download: true,
-          header: false,
-          skipEmptyLines: 'greedy',
-          complete: (results) => {
-            if (results.data && results.data.length > 0) {
-              parseRows(results.data, tabName);
-            } else {
-              tryDirectFetch(gvizUrl, tabName);
-            }
-          },
-          error: () => tryDirectFetch(gvizUrl, tabName)
-        });
-      };
-
-      const tryDirectFetch = (gvizUrl, tabName) => {
         Papa.parse(gvizUrl, {
           download: true,
           header: false,
@@ -152,16 +142,16 @@
         }
 
         let headerIndex = -1;
-        let colMap = { id: 0, name: 3, url: 4, clientReq: 5, tags: 8, industry: 9, location: 10 };
+        let colMap = { id: -1, name: -1, url: -1, clientReq: -1, tags: -1, industry: -1, location: -1 };
 
         for (let i = 0; i < Math.min(5, rawRows.length); i++) {
           const rowStr = rawRows[i].map(c => String(c).toLowerCase()).join(' ');
-          if (rowStr.includes('sample') || rowStr.includes('name') || rowStr.includes('location')) {
+          if (rowStr.includes('sample') || rowStr.includes('name') || rowStr.includes('location') || rowStr.includes('link') || rowStr.includes('url')) {
             headerIndex = i;
             rawRows[i].forEach((cell, colIdx) => {
               const c = String(cell).toLowerCase().trim();
               if (c.includes('id')) colMap.id = colIdx;
-              if (c.includes('name') || c.includes('title')) colMap.name = colIdx;
+              if (c.includes('name') || c.includes('title') || c.includes('sample')) colMap.name = colIdx;
               if (c.includes('link') || c.includes('url') || c.includes('sheet')) colMap.url = colIdx;
               if (c.includes('req') || c.includes('client')) colMap.clientReq = colIdx;
               if (c.includes('tag') || c.includes('key')) colMap.tags = colIdx;
@@ -173,59 +163,32 @@
         }
 
         const startIndex = headerIndex >= 0 ? headerIndex + 1 : 0;
-        
-        // Filter rows by tab name if "All Samples" isn't active
-        let targetRows = rawRows.slice(startIndex);
-        if (tabName !== "All Samples") {
-          const filteredByTab = targetRows.filter(row => {
-            const rowStr = row.map(c => String(c)).join(' ');
-            return rowStr.toLowerCase().includes(tabName.toLowerCase());
-          });
-          if (filteredByTab.length > 0) {
-            targetRows = filteredByTab;
-          }
-        }
+        const targetRows = rawRows.slice(startIndex);
 
         const formatted = targetRows.filter(row => row.some(cell => String(cell).trim() !== '')).map((row, idx) => {
-          const getVal = (colIdx) => row[colIdx] ? String(row[colIdx]).trim() : '';
+          const getVal = (colIdx) => (colIdx >= 0 && row[colIdx]) ? String(row[colIdx]).trim() : '';
 
           const sampleId = getVal(colMap.id) || `000${idx + 1}`.slice(-4);
           const sampleName = getVal(colMap.name) || getVal(0) || `Sample ${sampleId}`;
           
-          let rawSheetUrl = getVal(colMap.url) || row.find(c => String(c).includes('http')) || '';
+          // Locate exact sheet URL cell
+          let rawSheetUrl = getVal(colMap.url);
           if (!rawSheetUrl) {
-            rawSheetUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit#gid=0`;
+            const cellWithUrl = row.find(c => String(c).includes('http') || String(c).includes('docs.google.com'));
+            rawSheetUrl = cellWithUrl ? String(cellWithUrl) : '';
           }
-          
+
           const clientReq = getVal(colMap.clientReq) || '-';
-
-          let location = getVal(colMap.location);
-          if (!location || location === '-') {
-            const words = sampleName.split(' ');
-            if (words.length > 1 && words[words.length - 1] === words[words.length - 1].toUpperCase()) {
-              location = words[words.length - 1];
-            } else {
-              location = 'United States';
-            }
-          }
-
-          let industry = getVal(colMap.industry);
-          if (!industry || industry === '-') {
-            industry = 'Healthcare / Dental';
-          }
-
-          let tags = getVal(colMap.tags);
-          if (!tags || tags === '-') {
-            tags = sampleName;
-          }
-
+          const location = getVal(colMap.location) || 'United States';
+          const industry = getVal(colMap.industry) || 'Healthcare / Dental';
+          const tags = getVal(colMap.tags) || sampleName;
           const projectStatus = idx % 3 === 0 ? 'Completed' : (idx % 3 === 1 ? 'In Progress' : 'Paused');
 
           return {
             id: `${tabName}-${idx}`,
             sampleId,
             sampleName,
-            sampleSheet: extractUrl(rawSheetUrl),
+            sampleSheet: cleanUrl(rawSheetUrl),
             clientRequirement: clientReq,
             tags,
             industry,
