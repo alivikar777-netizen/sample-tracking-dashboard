@@ -247,8 +247,6 @@
         let headerIndex = -1;
         let colMap = { id: -1, name: -1, url: -1, clientReq: -1, tags: -1, industry: -1, location: -1, status: -1 };
 
-        // Normalize headers aggressively so values such as "Keywords / Tags",
-        // "Sample-Name" and "Sample Sheet URL" are all detected correctly.
         const normaliseHeader = (value) => String(value || "")
           .toLowerCase()
           .replace(/&/g, " and ")
@@ -257,6 +255,7 @@
           .trim();
 
         const hasWord = (text, word) => (` ${text} `).includes(` ${word} `);
+        const isDateLike = (value) => /^\d{1,4}[\/-]\d{1,2}[\/-]\d{1,4}$/.test(String(value || '').trim());
 
         const isIdHeader = (c) => [
           'id', 'sample id', 'sample no', 'sample number', 'sr no',
@@ -264,8 +263,11 @@
         ].includes(c);
 
         const isNameHeader = (c) =>
-          ['name', 'sample', 'samples', 'sample name', 'sample title', 'title', 'project name', 'list name'].includes(c) ||
-          (hasWord(c, 'sample') && (hasWord(c, 'name') || hasWord(c, 'title')));
+          ['name', 'sample', 'samples', 'sample name', 'sample title', 'title', 'project name', 'list name',
+           'job title', 'designation', 'role', 'position', 'technology', 'technology name', 'software',
+           'software name', 'platform', 'tool', 'e commerce', 'ecommerce', 'e commerce sample'].includes(c) ||
+          (hasWord(c, 'sample') && (hasWord(c, 'name') || hasWord(c, 'title'))) ||
+          (hasWord(c, 'job') && hasWord(c, 'title'));
 
         const isUrlHeader = (c) =>
           ['url', 'link', 'sheet', 'sheet url', 'sheet link', 'sample url', 'sample link',
@@ -282,7 +284,8 @@
           hasWord(c, 'tag') || hasWord(c, 'tags') || hasWord(c, 'keyword') || hasWord(c, 'keywords');
 
         const isIndustryHeader = (c) =>
-          ['industry', 'category', 'industry category'].includes(c) || hasWord(c, 'industry');
+          ['industry', 'category', 'industry category', 'vertical', 'niche'].includes(c) ||
+          hasWord(c, 'industry');
 
         const isLocationHeader = (c) =>
           ['location', 'country', 'state', 'city', 'region', 'geography'].includes(c) ||
@@ -299,9 +302,6 @@
           row.forEach((cell, colIdx) => {
             const c = normaliseHeader(cell);
             if (!c) return;
-
-            // Exact/controlled ID matching only. Do NOT use c.includes('no'),
-            // because that can incorrectly match columns such as Phone Number.
             if (map.id === -1 && isIdHeader(c)) { map.id = colIdx; score++; }
             if (map.name === -1 && isNameHeader(c)) { map.name = colIdx; score++; }
             if (map.url === -1 && isUrlHeader(c)) { map.url = colIdx; score++; }
@@ -315,10 +315,41 @@
           return { map, score };
         };
 
-        // Google Sheets may have title/blank rows before the real header.
-        // Check a wider range and pick the strongest matching header row.
+        const pickDisplayColumn = (row, map) => {
+          // Prefer a column that makes sense for the current tab.
+          const tab = normaliseHeader(tabName);
+          const headers = row.map(normaliseHeader);
+          const candidates = [];
+
+          const addMatches = (regex) => {
+            headers.forEach((h, i) => {
+              if (h && regex.test(h) && !candidates.includes(i)) candidates.push(i);
+            });
+          };
+
+          if (tab.includes('industry')) addMatches(/industry|category|vertical|niche/);
+          if (tab.includes('technology')) addMatches(/technology|software|platform|tool|product/);
+          if (tab.includes('e commerce') || tab.includes('ecommerce')) addMatches(/e commerce|ecommerce|store|marketplace|product|sample|name/);
+          if (tab.includes('title')) addMatches(/job title|title|designation|role|position/);
+
+          // Generic display labels.
+          addMatches(/sample name|sample title|project name|list name|name|title|technology|industry|category/);
+
+          // Finally use the first meaningful text column, but never URL/ID/status/date metadata.
+          row.forEach((cell, i) => {
+            const h = headers[i];
+            if (!h || candidates.includes(i)) return;
+            if (isUrlHeader(h) || isIdHeader(h) || isStatusHeader(h)) return;
+            if (/^(date|created|updated|timestamp|time|sr|no)$/.test(h)) return;
+            candidates.push(i);
+          });
+
+          return candidates.length ? candidates[0] : -1;
+        };
+
+        // 1) Normal path: strongest semantic header in the first 30 rows.
         let bestHeader = null;
-        for (let i = 0; i < Math.min(20, rawRows.length); i++) {
+        for (let i = 0; i < Math.min(30, rawRows.length); i++) {
           const candidate = mapHeaderRow(rawRows[i]);
           if (!bestHeader || candidate.score > bestHeader.score) {
             bestHeader = { ...candidate, index: i };
@@ -328,41 +359,63 @@
         if (bestHeader && bestHeader.score >= 2) {
           headerIndex = bestHeader.index;
           colMap = bestHeader.map;
-        } else {
-          // Compatibility fallback for sheets with unusual header labels.
-          // This keeps the old dashboard behaviour without reintroducing the
-          // dangerous broad ID matching bug.
-          for (let i = 0; i < Math.min(20, rawRows.length); i++) {
-            const normalized = rawRows[i].map(normaliseHeader);
-            const joined = normalized.join(' ');
-            const looksLikeHeader =
-              (joined.includes('sample') || joined.includes('name') || joined.includes('title')) &&
-              (joined.includes('link') || joined.includes('url') || joined.includes('sheet') ||
-               joined.includes('location') || joined.includes('industry') || joined.includes('keyword') || joined.includes('tag'));
+          if (colMap.name === -1) colMap.name = pickDisplayColumn(rawRows[headerIndex], colMap);
+        }
 
-            if (!looksLikeHeader) continue;
+        // 2) Compatibility path for simple list tabs such as Industry / Technology / E-Commerce.
+        // Some of these tabs only have one special label plus a Link column, so they should not be rejected.
+        if (headerIndex === -1 || colMap.name === -1) {
+          for (let i = 0; i < Math.min(30, rawRows.length); i++) {
+            const row = rawRows[i];
+            const normalized = row.map(normaliseHeader);
+            const nonEmpty = normalized.filter(Boolean);
+            if (nonEmpty.length < 2) continue;
+
+            const mapped = mapHeaderRow(row);
+            const hasUrlHeader = mapped.map.url !== -1 || normalized.some(isUrlHeader);
+            const hasUsefulLabel = normalized.some(c =>
+              isNameHeader(c) || isIndustryHeader(c) || isTagsHeader(c) || isLocationHeader(c) ||
+              /technology|software|platform|tool|e commerce|ecommerce|job title|designation|role|position|category|list/.test(c)
+            );
+
+            if (!hasUrlHeader && !hasUsefulLabel) continue;
+
+            const displayCol = mapped.map.name !== -1 ? mapped.map.name : pickDisplayColumn(row, mapped.map);
+            if (displayCol === -1) continue;
 
             headerIndex = i;
-            rawRows[i].forEach((cell, colIdx) => {
-              const c = normaliseHeader(cell);
-              if (colMap.id === -1 && isIdHeader(c)) colMap.id = colIdx;
-              if (colMap.name === -1 && (isNameHeader(c) || c.includes('sample name'))) colMap.name = colIdx;
-              if (colMap.url === -1 && isUrlHeader(c)) colMap.url = colIdx;
-              if (colMap.clientReq === -1 && isClientReqHeader(c)) colMap.clientReq = colIdx;
-              if (colMap.tags === -1 && isTagsHeader(c)) colMap.tags = colIdx;
-              if (colMap.industry === -1 && isIndustryHeader(c)) colMap.industry = colIdx;
-              if (colMap.location === -1 && isLocationHeader(c)) colMap.location = colIdx;
-              if (colMap.status === -1 && isStatusHeader(c)) colMap.status = colIdx;
-            });
+            colMap = mapped.map;
+            colMap.name = displayCol;
             break;
           }
         }
 
-        // If no header could be recognized, returning rows with guessed columns
-        // causes exactly the date/name mismatch seen in the broken version.
-        // Fail safely instead of displaying misleading cards.
+        // 3) Last-resort compatibility with the original working dashboard parser.
+        // Require a header-like keyword AND reject rows that mostly look like dates/numbers.
         if (headerIndex === -1 || colMap.name === -1) {
-          console.warn(`Header not recognized for tab: ${tabName}`, rawRows.slice(0, 5));
+          for (let i = 0; i < Math.min(30, rawRows.length); i++) {
+            const row = rawRows[i];
+            const normalized = row.map(normaliseHeader);
+            const joined = normalized.join(' ');
+            const nonEmptyRaw = row.map(v => String(v || '').trim()).filter(Boolean);
+            const dateCount = nonEmptyRaw.filter(isDateLike).length;
+            const looksLikeHeader = /sample|name|title|industry|technology|e commerce|ecommerce|category|location|link|url|sheet|keyword|tag/.test(joined);
+
+            if (!looksLikeHeader || (nonEmptyRaw.length > 0 && dateCount >= Math.ceil(nonEmptyRaw.length / 2))) continue;
+
+            const mapped = mapHeaderRow(row);
+            const displayCol = mapped.map.name !== -1 ? mapped.map.name : pickDisplayColumn(row, mapped.map);
+            if (displayCol === -1) continue;
+
+            headerIndex = i;
+            colMap = mapped.map;
+            colMap.name = displayCol;
+            break;
+          }
+        }
+
+        if (headerIndex === -1 || colMap.name === -1) {
+          console.warn(`Header not recognized for tab: ${tabName}`, rawRows.slice(0, 8));
           return [];
         }
 
@@ -375,7 +428,7 @@
             const getVal = (colIdx) => (colIdx >= 0 && row[colIdx] != null) ? String(row[colIdx]).trim() : '';
 
             const rawName = getVal(colMap.name);
-            if (!rawName) return null;
+            if (!rawName || isDateLike(rawName)) return null;
 
             const sampleId = getVal(colMap.id);
             let rawSheetUrl = getVal(colMap.url);
@@ -384,6 +437,10 @@
               const foundUrlCell = row.find(cell => cleanUrl(cell));
               if (foundUrlCell) rawSheetUrl = String(foundUrlCell);
             }
+
+            // Skip pure heading/footer rows with no usable link and no metadata only when they are obviously not data.
+            const hasAnyUsefulData = cleanUrl(rawSheetUrl) || getVal(colMap.industry) || getVal(colMap.location) || getVal(colMap.tags) || rawName;
+            if (!hasAnyUsefulData) return null;
 
             return {
               id: `${tabName}-${startIndex + idx}`,
