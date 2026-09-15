@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sample Tracking Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #F1F5F9; }
+    ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+  </style>
+</head>
+<body class="bg-[#F8FAFC] text-slate-800 antialiased min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    const SHEET_ID = "142xiSUpVUdMGkFkzvyFBCPp5M0J_0AtAdHlCsCUWqkg";
+
+    const SHEET_TABS = [
+      "All Samples",
+      "Government Contract Sample",
+      "Exhibitor & Attendee Samples",
+      "EXhibitior Count",
+      "Business Email List Samples",
+      "Funding Samples",
+      "Location Wise Email List",
+      "Doctors - Specialist Email List",
+      "Industry Email List",
+      "Title Email List",
+      "Technology Users Email List",
+      "E-Commerce Samples"
+    ];
+
+    const DOCTORS_FALLBACK_DATA = [
+      { name: "General Surgeon Email List", url: "https://docs.google.com/spreadsheets/d/1Qy6Dr9ZRVX7jLOSA7RInVh9IR60azNm8SLghW8YpjF8/edit?gid=1564292089#gid=1564292089" },
+      { name: "Anesthesiologist Email List", url: "https://docs.google.com/spreadsheets/d/1LeViVd3s7wrHD3DEA4ggEb0roThxbHjPAA8oz_CatFU/edit?gid=1564292089#gid=1564292089" },
+      { name: "Endocrinologist Email List", url: "https://docs.google.com/spreadsheets/d/1je9LaztidmbQ8qJo9NAXIGrOeriaV9ERh5Ln4BKKaYU/edit?gid=1564292089#gid=1564292089" },
+      { name: "Rheumatologist Email List", url: "https://docs.google.com/spreadsheets/d/1abSb4QffbLqE3v2oSgllHSKBJzd1qqPilWGo-IWSVkI/edit?gid=580190905#gid=580190905" },
+      { name: "Urologists Email List", url: "https://docs.google.com/spreadsheets/d/136O_i0eQrcPK5h0hi5bDBsaZcEmeRXXpoww08GxWWYM/edit?gid=1564292089#gid=1564292089" },
+      { name: "Pathologists email list", url: "https://docs.google.com/spreadsheets/d/1mP8byKzGhXA_BwySPQEXdona9FtHs6yIrBVpG8zTwes/edit?gid=1564292089#gid=1564292089" },
+      { name: "Pulmonologists Email List", url: "https://docs.google.com/spreadsheets/d/1phGzCW4YGkohfodTzrNVvOhR0uA7lj4p6Kov4txwdSQ/edit?gid=1564292089#gid=1564292089" },
+      { name: "Traumatologist Email List", url: "https://docs.google.com/spreadsheets/d/1W6vTrnq6avJb0LVNMD4v57KBdc9LRmPRUCQSYv5i24s/edit?gid=1564292089#gid=1564292089" },
+      { name: "Plastic Surgeons Email List", url: "https://docs.google.com/spreadsheets/d/1GKuiunYNcRKLwhoiqGcyJ4cVyZoCillRIwlPNRaffsc/edit?gid=1564292089#gid=1564292089" },
+      { name: "Hygienists Email List", url: "https://docs.google.com/spreadsheets/d/1q2HHvHqJ4mQznSTf_ps15HNXFI-TJXG_t5CYkH6Fyy/edit?gid=1564292089#gid=1564292089" },
+      { name: "Nutritionists Email List", url: "https://docs.google.com/spreadsheets/d/1qJbdMp85MkoPAGKON-sMFV7XkCxNTuZRh_Mpsr9ExE/edit?gid=1564292089#gid=1564292089" },
+      { name: "Sleep Medicine Specialists Email List", url: "https://docs.google.com/spreadsheets/d/1_-P8nUn42sljf7ko9Kek4mMuIBn6HWXYF1aEm6FyopU/edit?gid=1564292089#gid=1564292089" },
+      { name: "Hematologist Email List", url: "https://docs.google.com/spreadsheets/d/1GTQD3C1JZJJ5_Mq8dp9EXRNSYI2c4TWGRHd3wdCQrN4/edit?gid=1564292089#gid=1564292089" },
+      { name: "Audiologist Email List", url: "https://docs.google.com/spreadsheets/d/1am3ZQWcedTdD4bt6PpwN6KQUkbbq8p48-9mBXetM7k0/edit?gid=1564292089#gid=1564292089" },
+      { name: "Nephrologist Email List", url: "https://docs.google.com/spreadsheets/d/1RFV902XprUTg7PXWJenVUGrBeA9xQb-XRWY1t067IZc/edit?gid=1564292089#gid=1564292089" },
+      { name: "Neonatologist Email List", url: "https://docs.google.com/spreadsheets/d/1MPg3DHRLVWCB9i-0s4LZWOjVvGhwrGXd2e6ujziHy0E/edit?gid=1564292089#gid=1564292089" },
+      { name: "Gastroenterologist Specialist Email List", url: "https://docs.google.com/spreadsheets/d/1NFHmengOseC5qzLJROW_CqV8pepyQxCHxMyQoXZtkA/edit?gid=1564292089#gid=1564292089" },
+      { name: "Clinical Lipidologist Email List", url: "https://docs.google.com/spreadsheets/d/1woAx1TV21PNP3CEfLMIgviwX5T2-yWo1ZqlCNpHy3s/edit?gid=1564292089#gid=1564292089" },
+      { name: "Phlebotomist Email List", url: "https://docs.google.com/spreadsheets/d/1HcQT3w4OijJG2F3fgLgPWAAJ7I1EDwiTRn9u0hNi5CtA/edit?gid=1564292089#gid=1564292089" },
+      { name: "Optician Email List", url: "https://docs.google.com/spreadsheets/d/1vtBp8E18Ha3dRDREm5nB8aSajXq5Y6GUKHmeqZ6IWU/edit?gid=1564292089#gid=1564292089" },
+      { name: "Psychiatrists Email List", url: "https://docs.google.com/spreadsheets/d/1TpnwXnB6OYuuu9cio2xDjGBoOnBZW_pys4Q6G7rk/edit?gid=1564292089#gid=1564292089" },
+      { name: "Naturopathic Doctors Email List", url: "https://docs.google.com/spreadsheets/d/1OfCGC5Z3WG9d2FC2cED5HOSqSJfSV1C3_tgW7c0GVKI/edit?gid=1564292089#gid=1564292089" },
+      { name: "Neurosurgeon Email List", url: "https://docs.google.com/spreadsheets/d/1mQdQcTnfcJAFTAXtey3-09odP1ZoevxpshJBVP3A5Wo/edit?gid=1564292089#gid=1564292089" },
+      { name: "Epidemiologist Email List", url: "https://docs.google.com/spreadsheets/d/1WYDGJLcEvp69JTyyJbKkewwQO53l3NsmcXSIPr3KiWE/edit?gid=1564292089#gid=1564292089" },
+      { name: "Neuropathologist Email List", url: "https://docs.google.com/spreadsheets/d/1MdYznlmC4SG5I_X1UryrKv2I3XDlJkp1KhkWGaxflow/edit?gid=1564292089#gid=1564292089" },
+      { name: "ENT Doctor Email List", url: "https://docs.google.com/spreadsheets/d/1VjAduCWKDw6ghYePOu_OCcW3R-giHEw7v_LilkwGvLc/edit?gid=1564292089#gid=1564292089" },
+      { name: "Hypnotists Email List", url: "https://docs.google.com/spreadsheets/d/11_r3xvjZEbWiHCSgVngl6yTTY40h-C_fZehUlFNs0/edit?gid=1564292089#gid=1564292089" },
+      { name: "Medical Geneticist Email List", url: "https://docs.google.com/spreadsheets/d/15mmL8rjrcQ0TNWN8KQke6KDrngcYHb_QpnZf8jb1QAY/edit?gid=1564292089#gid=1564292089" },
+      { name: "Oral Surgeons Email List", url: "https://docs.google.com/spreadsheets/d/1Ik2AIUCMH73zUhelR6kZT_SS-tYQOrFeJm8t6ZCaawk/edit?gid=1564292089#gid=1564292089" },
+      { name: "Cosmetologists Email List", url: "https://docs.google.com/spreadsheets/d/1GBZJA2Op1kgpfF8e9X-4OHNEVt6UvpwD5OUcNZNKFo/edit?gid=1564292089#gid=1564292089" },
+      { name: "Allergist Email List", url: "https://docs.google.com/spreadsheets/d/100WVJCBCKRJCu3RsdjofUB3V-2Sla8-7sQZGMIHg_IU/edit?gid=1564292089#gid=1564292089" },
+      { name: "Osteopathic Physicians Email List", url: "https://docs.google.com/spreadsheets/d/1PGLA-I71eHDmfl6K6_4wfv4NROd0FZzeoyR06NpNPm/edit?gid=1564292089#gid=1564292089" },
+      { name: "Prosthodontist Email List", url: "https://docs.google.com/spreadsheets/d/1cCaM1R4uouKniKPwe-NWJ-uVY6fO4gRETSdhJqa4BZm/edit?gid=1564292089#gid=1564292089" }
+    ];
+
+    /* ---------- Badge colour helpers (screenshot style) ---------- */
+
+    const STATUS_STYLES = {
+      "completed":   "bg-emerald-50 text-emerald-700 border-emerald-200",
+      "in progress": "bg-amber-50 text-amber-700 border-amber-200",
+      "pending":     "bg-rose-50 text-rose-700 border-rose-200",
+      "on hold":     "bg-slate-100 text-slate-600 border-slate-200"
+    };
+    const statusStyle = (s) =>
+      STATUS_STYLES[String(s || "").toLowerCase().trim()] || STATUS_STYLES["on hold"];
+
+    const TAG_PALETTE = [
+      "bg-blue-50 text-blue-700 border-blue-200",
+      "bg-purple-50 text-purple-700 border-purple-200",
+      "bg-pink-50 text-pink-700 border-pink-200",
+      "bg-teal-50 text-teal-700 border-teal-200",
+      "bg-orange-50 text-orange-700 border-orange-200",
+      "bg-indigo-50 text-indigo-700 border-indigo-200",
+      "bg-lime-50 text-lime-700 border-lime-200"
+    ];
+    const tagStyle = (tag) => {
+      let h = 0;
+      const t = String(tag);
+      for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) >>> 0;
+      return TAG_PALETTE[h % TAG_PALETTE.length];
+    };
+
+    const splitTags = (raw) =>
+      String(raw || "")
+        .split(/[,/|;]+/)
+        .map(t => t.trim())
+        .filter(Boolean);
+
+    function App() {
+      const [activeTab, setActiveTab] = useState(SHEET_TABS[0]);
+      const [allTabsData, setAllTabsData] = useState({});
+      const [loading, setLoading] = useState(true);
+      const [globalSearch, setGlobalSearch] = useState("");
+      const [debouncedSearch, setDebouncedSearch] = useState("");
+      const [sortBy, setSortBy] = useState("default");
+      const [syncErrors, setSyncErrors] = useState([]);
+      const [lastSyncedAt, setLastSyncedAt] = useState(null);
+
+      const [selectedLocations, setSelectedLocations] = useState([]);
+      const [selectedIndustries, setSelectedIndustries] = useState([]);
+      const [selectedTags, setSelectedTags] = useState([]);
+
+      const [openSections, setOpenSections] = useState({ location: true, industry: true, tags: true });
+      const [showAllLocations, setShowAllLocations] = useState(false);
+      const [showAllIndustries, setShowAllIndustries] = useState(false);
+      const [showAllTags, setShowAllTags] = useState(false);
+
+      const [locationSearch, setLocationSearch] = useState("");
+      const [industrySearch, setIndustrySearch] = useState("");
+      const [tagSearch, setTagSearch] = useState("");
+
+      useEffect(() => { fetchAllTabsData(); }, []);
+
+      useEffect(() => {
+        const timer = setTimeout(() => setDebouncedSearch(globalSearch), 180);
+        return () => clearTimeout(timer);
+      }, [globalSearch]);
+
+      const toggleSection = (section) =>
+        setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
+
+      const formatCount = (num) => (num >= 1000 ? (num / 1000).toFixed(1) + 'k' : String(num));
+
+      const cleanUrl = (rawStr) => {
+        if (!rawStr) return "";
+        const str = String(rawStr).trim();
+        const urlMatch = str.match(/https?:\/\/[^\s"'<>]+/i);
+        if (urlMatch) return urlMatch[0];
+
+        // Handle Google Sheets URLs copied without protocol, but do not silently
+        // replace an invalid/missing sample URL with the master tracking sheet.
+        if (/^(docs\.google\.com|sheets\.google\.com)\//i.test(str)) {
+          return `https://${str}`;
+        }
+        return "";
+      };
+
+      const fetchAllTabsData = async () => {
+        if (loading && Object.keys(allTabsData).length > 0) return;
+
+        setLoading(true);
+        setSyncErrors([]);
+
+        try {
+          const results = await Promise.all(
+            SHEET_TABS.map(async (tabName) => {
+              try {
+                const response = await fetch(`/api/sheet?tab=${encodeURIComponent(tabName)}&_=${Date.now()}`, {
+                  cache: 'no-store',
+                  headers: { 'Accept': 'text/csv' }
+                });
+
+                if (!response.ok) {
+                  let message = `HTTP ${response.status}`;
+                  try {
+                    const body = await response.json();
+                    if (body && body.error) message = body.error;
+                  } catch (_) {}
+                  throw new Error(message);
+                }
+
+                const csvText = await response.text();
+                if (!csvText.trim()) throw new Error('Empty response');
+                if (/^\s*<!doctype html|^\s*<html/i.test(csvText)) {
+                  throw new Error('Google returned HTML instead of CSV');
+                }
+
+                const parsedCsv = Papa.parse(csvText, {
+                  header: false,
+                  skipEmptyLines: 'greedy'
+                });
+
+                if (parsedCsv.errors && parsedCsv.errors.length > 0 && (!parsedCsv.data || parsedCsv.data.length === 0)) {
+                  throw new Error('CSV parse failed');
+                }
+
+                const parsed = (parsedCsv.data && parsedCsv.data.length > 0)
+                  ? parseRows(parsedCsv.data, tabName)
+                  : [];
+
+                const data = tabName === "Doctors - Specialist Email List" && parsed.length === 0
+                  ? getDoctorsFallback()
+                  : parsed;
+
+                return { tabName, data, error: null };
+              } catch (error) {
+                console.error(`Failed to load tab: ${tabName}`, error);
+                return {
+                  tabName,
+                  data: tabName === "Doctors - Specialist Email List" ? getDoctorsFallback() : [],
+                  error: error?.message || 'Unable to load tab'
+                };
+              }
+            })
+          );
+
+          setAllTabsData(Object.fromEntries(results.map(r => [r.tabName, r.data])));
+          setSyncErrors(results.filter(r => r.error).map(r => ({ tab: r.tabName, message: r.error })));
+          setLastSyncedAt(new Date());
+        } catch (error) {
+          console.error('Dashboard sync failed', error);
+          setSyncErrors([{ tab: 'Dashboard', message: error?.message || 'Sync failed' }]);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const getDoctorsFallback = () =>
+        DOCTORS_FALLBACK_DATA.map((item, idx) => ({
+          id: `Doctors - Specialist Email List-${idx}`,
+          tabName: "Doctors - Specialist Email List",
+          sampleId: `DOC-${idx + 1}`,
+          sampleName: item.name,
+          sampleSheet: item.url,
+          clientRequirement: "",
+          tags: "",
+          industry: "",
+          location: "",
+          projectStatus: ""
+        }));
+
+      const parseRows = (rawRows, tabName) => {
+        if (!rawRows || rawRows.length === 0) return [];
+
+        let headerIndex = -1;
+        let colMap = { id: -1, name: -1, url: -1, clientReq: -1, tags: -1, industry: -1, location: -1, status: -1 };
+
+        const normaliseHeader = (value) => String(value || "")
+          .toLowerCase()
+          .replace(/[._-]+/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+
+        const isIdHeader = (c) => /^(id|sample id|sample no|sample number|sr no|sr no\.|serial no|serial number|s no|s\. no\.)$/.test(c);
+        const isNameHeader = (c) => /^(name|sample|samples|sample name|sample title|title|project name|list name)$/.test(c);
+        const isUrlHeader = (c) => /^(url|link|sheet|sheet url|sheet link|sample url|sample link|sample sheet|sample sheet url|sample sheet link)$/.test(c) || c.includes('spreadsheet');
+        const isClientReqHeader = (c) => c === 'requirement' || c === 'client requirement' || c.includes('client req');
+        const isTagsHeader = (c) => /^(tag|tags|keyword|keywords|keywords tags|keyword tags)$/.test(c);
+        const isIndustryHeader = (c) => /^(industry|category|industry category)$/.test(c);
+        const isLocationHeader = (c) => /^(location|country|state|city|region|geography)$/.test(c);
+        const isStatusHeader = (c) => /^(status|project status|stage)$/.test(c);
+
+        const mapHeaderRow = (row) => {
+          const map = { id: -1, name: -1, url: -1, clientReq: -1, tags: -1, industry: -1, location: -1, status: -1 };
+          let score = 0;
+
+          row.forEach((cell, colIdx) => {
+            const c = normaliseHeader(cell);
+            if (!c) return;
+
+            if (map.id === -1 && isIdHeader(c)) { map.id = colIdx; score++; }
+            if (map.name === -1 && isNameHeader(c)) { map.name = colIdx; score++; }
+            if (map.url === -1 && isUrlHeader(c)) { map.url = colIdx; score++; }
+            if (map.clientReq === -1 && isClientReqHeader(c)) { map.clientReq = colIdx; score++; }
+            if (map.tags === -1 && isTagsHeader(c)) { map.tags = colIdx; score++; }
+            if (map.industry === -1 && isIndustryHeader(c)) { map.industry = colIdx; score++; }
+            if (map.location === -1 && isLocationHeader(c)) { map.location = colIdx; score++; }
+            if (map.status === -1 && isStatusHeader(c)) { map.status = colIdx; score++; }
+          });
+
+          return { map, score };
+        };
+
+        // Search the first 10 rows and choose the row with the strongest header match.
+        // Requiring at least two recognised fields prevents a normal data row containing
+        // words such as "sample", "location" or "title" from being mistaken for a header.
+        let bestHeader = null;
+        for (let i = 0; i < Math.min(10, rawRows.length); i++) {
+          const candidate = mapHeaderRow(rawRows[i]);
+          if (!bestHeader || candidate.score > bestHeader.score) {
+            bestHeader = { ...candidate, index: i };
+          }
+        }
+
+        if (bestHeader && bestHeader.score >= 2) {
+          headerIndex = bestHeader.index;
+          colMap = bestHeader.map;
+        }
+
+        const startIndex = headerIndex >= 0 ? headerIndex + 1 : 0;
+        const targetRows = rawRows.slice(startIndex);
+
+        return targetRows
+          .filter(row => row.some(cell => String(cell || '').trim() !== ''))
+          .map((row, idx) => {
+            const getVal = (colIdx) => (colIdx >= 0 && row[colIdx] != null) ? String(row[colIdx]).trim() : '';
+
+            const firstNonUrlCell = row.find(cell => {
+              const value = String(cell || '').trim();
+              return value && !/^(https?:\/\/|docs\.google\.com|sheets\.google\.com)/i.test(value);
+            });
+            const rawName = getVal(colMap.name) || (firstNonUrlCell ? String(firstNonUrlCell).trim() : `Sample Record ${idx + 1}`);
+            const sampleId = getVal(colMap.id);
+
+            let rawSheetUrl = getVal(colMap.url);
+            if (!cleanUrl(rawSheetUrl)) {
+              const foundUrlCell = row.find(cell => cleanUrl(cell));
+              if (foundUrlCell) rawSheetUrl = String(foundUrlCell);
+            }
+
+            return {
+              id: `${tabName}-${startIndex + idx}`,
+              tabName,
+              sampleId,
+              sampleName: rawName,
+              sampleSheet: cleanUrl(rawSheetUrl),
+              clientRequirement: getVal(colMap.clientReq),
+              tags: getVal(colMap.tags),
+              industry: getVal(colMap.industry),
+              location: getVal(colMap.location),
+              projectStatus: getVal(colMap.status)
+            };
+          });
+      };
+
+      const currentScopeSamples = useMemo(() => {
+        if (debouncedSearch.trim() !== "") return Object.values(allTabsData).flat();
+        return allTabsData[activeTab] || [];
+      }, [allTabsData, activeTab, debouncedSearch]);
+
+      const countBy = (key) => {
+        const counts = {};
+        currentScopeSamples.forEach(s => {
+          if (s[key]) counts[s[key]] = (counts[s[key]] || 0) + 1;
+        });
+        return counts;
+      };
+
+      const locationCounts = useMemo(() => countBy('location'), [currentScopeSamples]);
+      const industryCounts = useMemo(() => countBy('industry'), [currentScopeSamples]);
+      const tagCounts = useMemo(() => {
+        const counts = {};
+        currentScopeSamples.forEach(s => {
+          splitTags(s.tags).forEach(t => { counts[t] = (counts[t] || 0) + 1; });
+        });
+        return counts;
+      }, [currentScopeSamples]);
+
+      const sortFilterOptions = (counts, query) =>
+        Object.keys(counts)
+          .filter(x => x.toLowerCase().includes(query.toLowerCase()))
+          .sort((a, b) => (counts[b] - counts[a]) || a.localeCompare(b, undefined, { sensitivity: 'base' }));
+
+      const filteredLocations = useMemo(
+        () => sortFilterOptions(locationCounts, locationSearch),
+        [locationCounts, locationSearch]
+      );
+      const filteredIndustries = useMemo(
+        () => sortFilterOptions(industryCounts, industrySearch),
+        [industryCounts, industrySearch]
+      );
+      const filteredTagsList = useMemo(
+        () => sortFilterOptions(tagCounts, tagSearch),
+        [tagCounts, tagSearch]
+      );
+
+      const makeToggleAll = (filteredList, selected, setSelected) => () => {
+        const allSelected = filteredList.length > 0 && filteredList.every(x => selected.includes(x));
+        if (allSelected) setSelected(prev => prev.filter(x => !filteredList.includes(x)));
+        else setSelected(prev => Array.from(new Set([...prev, ...filteredList])));
+      };
+
+      const filteredSamples = useMemo(() => {
+        return currentScopeSamples.filter(item => {
+          const search = debouncedSearch.toLowerCase().trim();
+          const matchesGlobalSearch = search === "" ||
+            (item.sampleName && item.sampleName.toLowerCase().includes(search)) ||
+            (item.sampleId && item.sampleId.toLowerCase().includes(search)) ||
+            (item.location && item.location.toLowerCase().includes(search)) ||
+            (item.industry && item.industry.toLowerCase().includes(search)) ||
+            (item.tags && item.tags.toLowerCase().includes(search)) ||
+            (item.tabName && item.tabName.toLowerCase().includes(search));
+
+          const matchesLocation = selectedLocations.length === 0 || (item.location && selectedLocations.includes(item.location));
+          const matchesIndustry = selectedIndustries.length === 0 || (item.industry && selectedIndustries.includes(item.industry));
+          const itemTags = splitTags(item.tags);
+          const matchesTags = selectedTags.length === 0 || itemTags.some(t => selectedTags.includes(t));
+
+          return matchesGlobalSearch && matchesLocation && matchesIndustry && matchesTags;
+        });
+      }, [currentScopeSamples, debouncedSearch, selectedLocations, selectedIndustries, selectedTags]);
+
+      const sortedSamples = useMemo(() => {
+        const rows = [...filteredSamples];
+        const textValue = (item, key) => String(item[key] || "").trim();
+
+        switch (sortBy) {
+          case "name-asc":
+            return rows.sort((a, b) => textValue(a, 'sampleName').localeCompare(textValue(b, 'sampleName'), undefined, { sensitivity: 'base' }));
+          case "name-desc":
+            return rows.sort((a, b) => textValue(b, 'sampleName').localeCompare(textValue(a, 'sampleName'), undefined, { sensitivity: 'base' }));
+          case "location-asc":
+            return rows.sort((a, b) => textValue(a, 'location').localeCompare(textValue(b, 'location'), undefined, { sensitivity: 'base' }));
+          case "location-desc":
+            return rows.sort((a, b) => textValue(b, 'location').localeCompare(textValue(a, 'location'), undefined, { sensitivity: 'base' }));
+          case "industry-asc":
+            return rows.sort((a, b) => textValue(a, 'industry').localeCompare(textValue(b, 'industry'), undefined, { sensitivity: 'base' }));
+          case "industry-desc":
+            return rows.sort((a, b) => textValue(b, 'industry').localeCompare(textValue(a, 'industry'), undefined, { sensitivity: 'base' }));
+          default:
+            return rows;
+        }
+      }, [filteredSamples, sortBy]);
+
+      const toggleFilter = (item, list, setList) =>
+        setList(prev => prev.includes(item) ? prev.filter(x => x !== item) : [...prev, item]);
+
+      const handleTabChange = (tab) => {
+        setActiveTab(tab);
+        setGlobalSearch("");
+        setSelectedLocations([]); setSelectedIndustries([]); setSelectedTags([]);
+        setLocationSearch(""); setIndustrySearch(""); setTagSearch("");
+        setSortBy("default");
+      };
+
+      const clearAllFilters = () => {
+        setSelectedLocations([]); setSelectedIndustries([]); setSelectedTags([]);
+      };
+
+      const activeFilterCount = selectedLocations.length + selectedIndustries.length + selectedTags.length;
+
+      /* ---------- Reusable filter block ---------- */
+      const FilterBlock = ({ label, sectionKey, list, counts, selected, setSelected,
+                            search, setSearch, showAll, setShowAll, last }) => (
+        Object.keys(counts).length === 0 && selected.length === 0 ? null :
+        <div className={last ? "pb-2" : "border-b border-slate-100 pb-4"}>
+          <div onClick={() => toggleSection(sectionKey)}
+               className="flex justify-between items-center cursor-pointer mb-2 text-slate-800 font-semibold text-sm">
+            <span>{label}</span>
+            <span className="text-xs text-slate-400">{openSections[sectionKey] ? '▲' : '▼'}</span>
+          </div>
+
+          {openSections[sectionKey] && (
+            <div className="space-y-1.5 mt-2">
+              {Object.keys(counts).length > 0 && (
+                <input
+                  type="text"
+                  placeholder={`Search ${label.toLowerCase()}...`}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-blue-500 mb-1"
+                />
+              )}
+
+              {list.length === 0 ? (
+                <p className="text-xs text-slate-400 italic">No {label.toLowerCase()} available</p>
+              ) : (
+                <>
+                  <label className="flex items-center justify-between text-xs text-blue-600 font-semibold cursor-pointer hover:bg-blue-50 p-1 rounded border-b border-slate-100 mb-1">
+                    <div className="flex items-center gap-2">
+                      <input type="checkbox"
+                        checked={list.length > 0 && list.every(x => selected.includes(x))}
+                        onChange={makeToggleAll(list, selected, setSelected)}
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                      <span>Select All ({list.length})</span>
+                    </div>
+                  </label>
+
+                  {(showAll ? list : list.slice(0, 5)).map(x => (
+                    <label key={x} className="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <input type="checkbox"
+                          checked={selected.includes(x)}
+                          onChange={() => toggleFilter(x, selected, setSelected)}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0" />
+                        <span className="truncate max-w-[120px]" title={x}>{x}</span>
+                      </div>
+                      <span className="text-slate-400 font-mono shrink-0 ml-1">{formatCount(counts[x])}</span>
+                    </label>
+                  ))}
+                </>
+              )}
+
+              {list.length > 5 && (
+                <button onClick={() => setShowAll(!showAll)}
+                  className="text-xs text-blue-600 hover:underline font-medium block pt-1">
+                  {showAll ? 'See Less' : 'See More'}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      );
+
+      /* ---------- Sample card (screenshot layout) ---------- */
+      const SampleCard = ({ item }) => {
+        const tags = splitTags(item.tags);
+        const hasMeta = Boolean(item.sampleId || item.location || item.industry || item.clientRequirement);
+        return (
+          <div className="bg-white rounded-lg border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 transition p-4 flex flex-col">
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <h3 className="text-sm font-semibold text-slate-800 leading-snug line-clamp-2" title={item.sampleName}>
+                {item.sampleName}
+              </h3>
+              {item.projectStatus && (
+                <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${statusStyle(item.projectStatus)}`}>
+                  {item.projectStatus}
+                </span>
+              )}
+            </div>
+
+            {hasMeta && (
+              <div className="space-y-1 text-[11px] text-slate-600 flex-1">
+                {item.sampleId && (
+                  <p><span className="text-slate-400">Sample ID:</span> <span className="font-mono text-slate-700">{item.sampleId}</span></p>
+                )}
+                {item.location && (
+                  <p className="truncate"><span className="text-slate-400">Location:</span> {item.location}</p>
+                )}
+                {item.industry && (
+                  <p className="truncate"><span className="text-slate-400">Industry:</span> {item.industry}</p>
+                )}
+                {item.clientRequirement && (
+                  <p className="truncate" title={item.clientRequirement}>
+                    <span className="text-slate-400">Requirement:</span> {item.clientRequirement}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className={`flex items-end justify-between gap-2 ${hasMeta ? 'mt-3 pt-2 border-t border-slate-100' : 'mt-3'}`}>
+              <div className="flex flex-wrap items-center gap-1 min-w-0">
+                {tags.length > 0 && <span className="text-[10px] text-slate-400 mr-0.5">Keywords/Tags:</span>}
+                {tags.slice(0, 3).map((t, i) => (
+                  <span key={i} className={`text-[10px] px-1.5 py-0.5 rounded border ${tagStyle(t)}`}>{t}</span>
+                ))}
+                {tags.length > 3 && <span className="text-[10px] text-slate-400">+{tags.length - 3}</span>}
+              </div>
+              {item.sampleSheet ? (
+                <a href={item.sampleSheet} target="_blank" rel="noopener noreferrer"
+                   title="Open sample sheet"
+                   className="shrink-0 w-6 h-6 grid place-items-center rounded border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-400 hover:bg-blue-50 transition">
+                  ↗
+                </a>
+              ) : (
+                <span title="Sample link unavailable"
+                  className="shrink-0 w-6 h-6 grid place-items-center rounded border border-slate-200 text-slate-300 cursor-not-allowed">
+                  ↗
+                </span>
+              )}
+            </div>
+          </div>
+        );
+      };
+
+      return (
+        <div className="min-h-screen flex flex-col bg-[#F8FAFC]">
+          {/* Header */}
+          <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between gap-4 sticky top-0 z-30 shadow-sm">
+            <div className="flex items-center space-x-3">
+              <div className="p-1.5 bg-blue-600 text-white rounded font-bold text-sm">ST</div>
+              <h1 className="text-base font-semibold text-slate-800">Sample Tracking Dashboard</h1>
+            </div>
+
+            <div className="flex-1 max-w-xl">
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-sm">🔍</span>
+                <input
+                  type="text"
+                  placeholder="Search across all 12 tabs..."
+                  value={globalSearch}
+                  onChange={(e) => setGlobalSearch(e.target.value)}
+                  className="w-full pl-9 pr-4 py-1.5 bg-slate-100/80 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2 text-xs text-slate-500">
+              <div className="flex flex-col items-end leading-tight">
+                <span className={syncErrors.length ? "text-amber-600" : ""}>
+                  {loading ? 'Syncing…' : syncErrors.length ? `Sync complete · ${syncErrors.length} issue${syncErrors.length > 1 ? 's' : ''}` : 'Sync complete'}
+                </span>
+                {!loading && lastSyncedAt && (
+                  <span className="text-[10px] text-slate-400" title={lastSyncedAt.toLocaleString()}>
+                    Last synced {lastSyncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={fetchAllTabsData}
+                disabled={loading}
+                className={`p-1.5 rounded-full border border-slate-200 ${loading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-100'}`}
+                title={loading ? "Sync in progress" : "Refresh Data"}
+              >
+                <span className={loading ? "inline-block animate-spin" : "inline-block"}>🔄</span>
+              </button>
+            </div>
+          </header>
+
+          {/* Tabs */}
+          <div className="bg-white border-b border-slate-200 px-6 overflow-x-auto whitespace-nowrap">
+            <div className="flex space-x-1 py-1">
+              {SHEET_TABS.map((tab) => {
+                const isActive = activeTab === tab && globalSearch.trim() === "";
+                return (
+                  <button key={tab} onClick={() => handleTabChange(tab)}
+                    className={`px-3 py-2 text-xs font-medium rounded-md transition ${
+                      isActive ? 'bg-blue-50 text-blue-600 font-semibold border-b-2 border-blue-600'
+                               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}`}>
+                    {tab}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex flex-1">
+            {/* Sidebar */}
+            <aside className="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0 select-none">
+              <div className="p-4 space-y-5 overflow-y-auto flex-1">
+                <FilterBlock label="Location" sectionKey="location"
+                  list={filteredLocations} counts={locationCounts}
+                  selected={selectedLocations} setSelected={setSelectedLocations}
+                  search={locationSearch} setSearch={setLocationSearch}
+                  showAll={showAllLocations} setShowAll={setShowAllLocations} />
+
+                <FilterBlock label="Industry" sectionKey="industry"
+                  list={filteredIndustries} counts={industryCounts}
+                  selected={selectedIndustries} setSelected={setSelectedIndustries}
+                  search={industrySearch} setSearch={setIndustrySearch}
+                  showAll={showAllIndustries} setShowAll={setShowAllIndustries} />
+
+                <FilterBlock label="Keywords / Tags" sectionKey="tags"
+                  list={filteredTagsList} counts={tagCounts}
+                  selected={selectedTags} setSelected={setSelectedTags}
+                  search={tagSearch} setSearch={setTagSearch}
+                  showAll={showAllTags} setShowAll={setShowAllTags} last />
+              </div>
+            </aside>
+
+            {/* Main */}
+            <main className="flex-1 p-6 overflow-y-auto">
+              <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
+                <h2 className="text-lg font-bold text-slate-800">
+                  {globalSearch.trim() !== ""
+                    ? `Search Results across all tabs (${filteredSamples.length})`
+                    : `${activeTab} (${filteredSamples.length})`}
+                </h2>
+                <div className="flex items-center gap-3">
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-md text-xs text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    title="Sort samples"
+                  >
+                    <option value="default">Sort: Default</option>
+                    <option value="name-asc">Name: A–Z</option>
+                    <option value="name-desc">Name: Z–A</option>
+                    <option value="location-asc">Location: A–Z</option>
+                    <option value="location-desc">Location: Z–A</option>
+                    <option value="industry-asc">Industry: A–Z</option>
+                    <option value="industry-desc">Industry: Z–A</option>
+                  </select>
+
+                  {activeFilterCount > 0 && (
+                    <button onClick={clearAllFilters}
+                      className="text-xs text-blue-600 hover:underline font-medium">
+                      Clear filters ({activeFilterCount})
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {!loading && syncErrors.length > 0 && (
+                <div className="mb-4 px-3 py-2 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800" title={syncErrors.map(e => `${e.tab}: ${e.message}`).join('\n')}>
+                  ⚠ {syncErrors.length} tab{syncErrors.length > 1 ? 's' : ''} could not be refreshed. Other available data is still shown.
+                </div>
+              )}
+
+              {loading ? (
+                <div className="flex justify-center items-center h-64">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+              ) : sortedSamples.length === 0 ? (
+                <div className="bg-white rounded-lg border border-slate-200 p-8 text-center text-slate-500">
+                  No sample records found.
+                </div>
+              ) : (
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {sortedSamples.map(item => <SampleCard key={item.id} item={item} />)}
+                </div>
+              )}
+            </main>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
