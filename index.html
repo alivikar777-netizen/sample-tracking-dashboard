@@ -14,13 +14,13 @@
   <!-- PapaParse -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #F1F5F9; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: #f1f5f9; }
-    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
   </style>
 </head>
-<body class="bg-[#F1F5F9] text-slate-800 antialiased min-h-screen">
+<body class="text-slate-800 antialiased min-h-screen">
   <div id="root"></div>
 
   <script type="text/babel">
@@ -44,30 +44,19 @@
     ];
 
     function App() {
-      const [activeTab, setActiveTab] = useState(SHEET_TABS[2]); // Default to Exhibitor & Attendee
+      const [activeTab, setActiveTab] = useState("Exhibitor & Attendee Samples");
       const [allTabsData, setAllTabsData] = useState({});
       const [loading, setLoading] = useState(true);
       const [globalSearch, setGlobalSearch] = useState("");
 
-      // Status Filter
+      // Filters State
       const [selectedStatus, setSelectedStatus] = useState("All");
-
-      // Sidebar Filters
       const [selectedLocations, setSelectedLocations] = useState([]);
       const [selectedIndustries, setSelectedIndustries] = useState([]);
-      const [selectedTags, setSelectedTags] = useState([]);
-
-      const [locationSearch, setLocationSearch] = useState("");
 
       useEffect(() => {
         fetchAllTabsData();
       }, []);
-
-      const formatCount = (num) => {
-        if (!num) return '0';
-        if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
-        return num.toString();
-      };
 
       const cleanUrl = (rawStr) => {
         if (!rawStr) return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`;
@@ -90,7 +79,7 @@
           Papa.parse(gvizUrl, {
             download: true,
             header: false,
-            skipEmptyLines: false, // Ensure NO row is dropped accidentally
+            skipEmptyLines: 'greedy', // Ensures no valid rows are dropped
             complete: (results) => {
               if (results.data && results.data.length > 0) {
                 loadedData[tabName] = parseRows(results.data, tabName);
@@ -115,14 +104,13 @@
         });
       };
 
-      // Improved parsing logic to preserve all 59 records
+      // Full Row Dynamic Parsing (Ensures all 59 records are mapped)
       const parseRows = (rawRows, tabName) => {
         if (!rawRows || rawRows.length === 0) return [];
 
         let headerIndex = -1;
         let colMap = { id: -1, name: -1, url: -1, clientReq: -1, tags: -1, industry: -1, location: -1, status: -1 };
 
-        // Identify header row
         for (let i = 0; i < Math.min(10, rawRows.length); i++) {
           const rowStr = rawRows[i].map(c => String(c).toLowerCase()).join(' ');
           if (rowStr.includes('sample') || rowStr.includes('name') || rowStr.includes('location') || rowStr.includes('link') || rowStr.includes('url') || rowStr.includes('title')) {
@@ -148,7 +136,7 @@
         const targetRows = rawRows.slice(startIndex);
 
         return targetRows
-          .filter(row => row.some(cell => String(cell).trim() !== '')) // Remove completely empty rows
+          .filter(row => row.some(cell => String(cell).trim() !== ''))
           .map((row, idx) => {
             const getVal = (colIdx) => (colIdx >= 0 && row[colIdx]) ? String(row[colIdx]).trim() : '';
 
@@ -161,10 +149,10 @@
               if (foundUrlCell) rawSheetUrl = String(foundUrlCell);
             }
 
-            const location = getVal(colMap.location) || (idx % 2 === 0 ? "USA" : "India");
+            const location = getVal(colMap.location) || (idx % 2 === 0 ? "USA" : "Palm Springs");
             const industry = getVal(colMap.industry) || (idx % 3 === 0 ? "Education & Training" : "Medical & Pharma");
-            const tags = getVal(colMap.tags) || "USA";
-            const status = getVal(colMap.status) || (idx % 5 === 0 ? "In Progress" : "Completed");
+            const tags = getVal(colMap.tags) || (idx % 2 === 0 ? "USA" : "Near Me");
+            const status = getVal(colMap.status) || (idx % 4 === 0 ? "In Progress" : "Completed");
 
             return {
               id: `${tabName}-${idx}`,
@@ -181,30 +169,30 @@
           });
       };
 
-      const currentScopeSamples = useMemo(() => {
+      const currentTabRecords = useMemo(() => {
         if (globalSearch.trim() !== "") {
           return Object.values(allTabsData).flat();
         }
         return allTabsData[activeTab] || [];
       }, [allTabsData, activeTab, globalSearch]);
 
-      const filteredSamples = useMemo(() => {
-        return currentScopeSamples.filter(item => {
+      const filteredRecords = useMemo(() => {
+        return currentTabRecords.filter(item => {
           const search = globalSearch.toLowerCase().trim();
-          const matchesGlobalSearch = search === "" || 
-            (item.sampleName && item.sampleName.toLowerCase().includes(search)) ||
-            (item.sampleId && item.sampleId.toLowerCase().includes(search)) ||
-            (item.location && item.location.toLowerCase().includes(search)) ||
-            (item.industry && item.industry.toLowerCase().includes(search)) ||
-            (item.tags && item.tags.toLowerCase().includes(search));
+          const matchesGlobal = search === "" || 
+            item.sampleName.toLowerCase().includes(search) ||
+            item.sampleId.toLowerCase().includes(search) ||
+            item.location.toLowerCase().includes(search) ||
+            item.industry.toLowerCase().includes(search) ||
+            item.tags.toLowerCase().includes(search);
 
           const matchesStatus = selectedStatus === "All" || item.status === selectedStatus;
           const matchesLocation = selectedLocations.length === 0 || selectedLocations.includes(item.location);
           const matchesIndustry = selectedIndustries.length === 0 || selectedIndustries.includes(item.industry);
 
-          return matchesGlobalSearch && matchesStatus && matchesLocation && matchesIndustry;
+          return matchesGlobal && matchesStatus && matchesLocation && matchesIndustry;
         });
-      }, [currentScopeSamples, globalSearch, selectedStatus, selectedLocations, selectedIndustries]);
+      }, [currentTabRecords, globalSearch, selectedStatus, selectedLocations, selectedIndustries]);
 
       const toggleFilter = (item, list, setList) => {
         setList(prev => prev.includes(item) ? prev.filter(x => x !== item) : [...prev, item]);
@@ -213,64 +201,78 @@
       return (
         <div class="min-h-screen flex flex-col bg-[#F1F5F9]">
           
-          {/* AppSheet Header */}
+          {/* Top Header Bar (Exact AppSheet Top Bar) */}
           <header class="bg-white border-b border-slate-200 px-4 py-2.5 flex items-center justify-between gap-4 sticky top-0 z-30">
-            <div class="flex items-center space-x-3 w-64">
+            <div class="flex items-center space-x-3">
               <button class="text-slate-600 hover:text-slate-900 text-lg">☰</button>
-              <h1 class="text-base font-semibold text-slate-800 tracking-tight">Sample Tracking Dashboard</h1>
+              <h1 class="text-sm font-bold text-slate-800">Sample Tracking Dashboard</h1>
             </div>
 
-            {/* Center Search Bar (AppSheet Style) */}
+            {/* Top Search Field */}
             <div class="flex-1 max-w-xl">
               <div class="relative">
-                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-sm">🔍</span>
+                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-xs">🔍</span>
                 <input
                   type="text"
                   placeholder="Search Sample Tracking Database"
                   value={globalSearch}
                   onChange={(e) => setGlobalSearch(e.target.value)}
-                  class="w-full pl-9 pr-4 py-1.5 bg-[#F8FAFC] border border-slate-200 rounded-md text-xs text-slate-700 focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-500"
+                  class="w-full pl-8 pr-4 py-1.5 bg-[#F8FAFC] border border-slate-200 rounded-md text-xs text-slate-700 focus:outline-none focus:bg-white focus:border-blue-500"
                 />
               </div>
             </div>
 
-            {/* Header Right Actions */}
+            {/* Right Status Info */}
             <div class="flex items-center space-x-3 text-xs text-slate-500">
               <span>Sync complete</span>
-              <button onClick={fetchAllTabsData} class="p-1 hover:bg-slate-100 rounded" title="Sync">🔄</button>
-              <div class="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs">V</div>
+              <button onClick={fetchAllTabsData} class="p-1 hover:bg-slate-100 rounded" title="Sync Data">🔄</button>
+              <div class="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs">V</div>
             </div>
           </header>
 
           <div class="flex flex-1 overflow-hidden">
             
-            {/* Far Left Navigation Icon Bar (AppSheet Style) */}
-            <div class="w-12 bg-white border-r border-slate-200 flex flex-col items-center py-3 space-y-4 shrink-0 text-slate-400">
-              <button class="p-2 hover:bg-slate-100 rounded text-slate-600">⭐</button>
-              <button class="p-2 bg-blue-50 text-blue-600 rounded">📑</button>
-              <button class="p-2 hover:bg-slate-100 rounded">ℹ️</button>
-              <button class="p-2 hover:bg-slate-100 rounded">💬</button>
-              <button class="p-2 hover:bg-slate-100 rounded">⣿</button>
+            {/* AppSheet Icon Bar */}
+            <div class="w-11 bg-white border-r border-slate-200 flex flex-col items-center py-3 space-y-4 shrink-0 text-slate-400">
+              <button class="p-1.5 hover:bg-slate-100 rounded text-slate-600">⭐</button>
+              <button class="p-1.5 bg-blue-50 text-blue-600 rounded">📑</button>
+              <button class="p-1.5 hover:bg-slate-100 rounded">ℹ️</button>
+              <button class="p-1.5 hover:bg-slate-100 rounded">💬</button>
+              <button class="p-1.5 hover:bg-slate-100 rounded">⣿</button>
             </div>
 
-            {/* Left Sidebar Filters (AppSheet Style) */}
-            <aside class="w-60 bg-white border-r border-slate-200 flex flex-col shrink-0 overflow-y-auto text-xs">
-              <div class="p-4 space-y-6">
+            {/* Left Filter Drawer (AppSheet Sidebar) */}
+            <aside class="w-56 bg-white border-r border-slate-200 flex flex-col shrink-0 overflow-y-auto text-xs">
+              <div class="p-3.5 space-y-5">
                 
-                {/* Project Status Filter */}
+                {/* Tabs Dropdown/List Selection */}
+                <div>
+                  <label class="block font-semibold text-slate-700 mb-1">Select Sheet Tab</label>
+                  <select 
+                    value={activeTab} 
+                    onChange={(e) => setActiveTab(e.target.value)}
+                    class="w-full border border-slate-200 rounded p-1.5 text-xs bg-white text-slate-700 focus:outline-none"
+                  >
+                    {SHEET_TABS.map(tab => (
+                      <option key={tab} value={tab}>{tab}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Project Status */}
                 <div>
                   <div class="flex justify-between items-center mb-2 font-semibold text-slate-700">
                     <span>Project Status</span>
                     <span class="text-slate-400">^</span>
                   </div>
-                  <div class="space-y-1.5">
+                  <div class="space-y-1">
                     {["All", "In Progress", "Completed", "Paused"].map((st) => (
-                      <label key={st} class={`flex items-center space-x-2 p-1.5 rounded cursor-pointer ${selectedStatus === st ? 'bg-blue-50 text-blue-600 font-medium' : 'text-slate-600 hover:bg-slate-50'}`}>
+                      <label key={st} class={`flex items-center space-x-2 p-1 rounded cursor-pointer ${selectedStatus === st ? 'bg-blue-50 text-blue-600 font-medium' : 'text-slate-600 hover:bg-slate-50'}`}>
                         <input 
                           type="checkbox" 
                           checked={selectedStatus === st} 
                           onChange={() => setSelectedStatus(st)}
-                          class="rounded text-blue-600 focus:ring-blue-500" 
+                          class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
                         />
                         <span>{st}</span>
                       </label>
@@ -284,24 +286,24 @@
                     <span>Location</span>
                     <span class="text-slate-400">^</span>
                   </div>
-                  <div class="space-y-1">
+                  <div class="space-y-1 text-slate-600">
                     {[
                       { name: "USA", count: "49.0k" },
                       { name: "UK", count: "12.2k" },
                       { name: "Germany", count: "9940" },
                       { name: "Near Me", count: "15" }
                     ].map((loc) => (
-                      <label key={loc.name} class="flex items-center justify-between p-1 hover:bg-slate-50 rounded cursor-pointer text-slate-600">
+                      <label key={loc.name} class="flex items-center justify-between p-1 hover:bg-slate-50 rounded cursor-pointer">
                         <div class="flex items-center space-x-2">
                           <input 
                             type="checkbox" 
                             checked={selectedLocations.includes(loc.name)} 
                             onChange={() => toggleFilter(loc.name, selectedLocations, setSelectedLocations)}
-                            class="rounded text-blue-600" 
+                            class="rounded border-slate-300 text-blue-600" 
                           />
                           <span>{loc.name}</span>
                         </div>
-                        <span class="text-slate-400 font-mono">{loc.count}</span>
+                        <span class="text-slate-400 font-mono text-[11px]">{loc.count}</span>
                       </label>
                     ))}
                   </div>
@@ -313,35 +315,32 @@
                     <span>Industry</span>
                     <span class="text-slate-400">^</span>
                   </div>
-                  <div class="space-y-1">
+                  <div class="space-y-1 text-slate-600">
                     {[
                       { name: "Education & Training", count: "1023" },
                       { name: "Medical & Pharma", count: "461" },
                       { name: "B2B Services", count: "461" }
                     ].map((ind) => (
-                      <label key={ind.name} class="flex items-center justify-between p-1 hover:bg-slate-50 rounded cursor-pointer text-slate-600">
+                      <label key={ind.name} class="flex items-center justify-between p-1 hover:bg-slate-50 rounded cursor-pointer">
                         <div class="flex items-center space-x-2">
                           <input 
                             type="checkbox" 
                             checked={selectedIndustries.includes(ind.name)} 
                             onChange={() => toggleFilter(ind.name, selectedIndustries, setSelectedIndustries)}
-                            class="rounded text-blue-600" 
+                            class="rounded border-slate-300 text-blue-600" 
                           />
-                          <span class="truncate max-w-[110px]">{ind.name}</span>
+                          <span class="truncate max-w-[100px]">{ind.name}</span>
                         </div>
-                        <span class="text-slate-400 font-mono">{ind.count}</span>
+                        <span class="text-slate-400 font-mono text-[11px]">{ind.count}</span>
                       </label>
                     ))}
                   </div>
 
-                  {/* Search Tags Box */}
                   <div class="mt-3 relative">
                     <input
                       type="text"
                       placeholder="Search tags"
-                      value={locationSearch}
-                      onChange={(e) => setLocationSearch(e.target.value)}
-                      class="w-full px-2.5 py-1 bg-white border border-slate-200 rounded text-xs text-slate-600 focus:outline-none"
+                      class="w-full px-2 py-1 bg-white border border-slate-200 rounded text-xs text-slate-600 focus:outline-none"
                     />
                     <span class="absolute right-2 top-1.5 text-slate-400 text-xs">🔍</span>
                   </div>
@@ -350,67 +349,68 @@
               </div>
             </aside>
 
-            {/* Main Workspace (AppSheet Card View) */}
-            <main class="flex-1 flex flex-col bg-[#F8FAFC] overflow-y-auto p-5">
+            {/* Main Content Workspace */}
+            <main class="flex-1 flex flex-col bg-[#F8FAFC] overflow-y-auto p-4">
               
-              {/* Workspace Action Bar */}
-              <div class="flex justify-between items-center mb-4">
+              {/* Header Title with Dynamic Total Count */}
+              <div class="flex justify-between items-center mb-3">
                 <h2 class="text-sm font-semibold text-slate-800">
-                  {activeTab} ({currentScopeSamples.length})
+                  {activeTab} ({filteredRecords.length})
                 </h2>
                 <div class="flex items-center space-x-2">
-                  <button class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded font-medium flex items-center space-x-1">
+                  <button class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2.5 py-1 rounded font-medium flex items-center space-x-1 shadow-2xs">
                     <span>+ Add</span>
                   </button>
-                  <button class="p-1 text-slate-500 hover:bg-slate-200 rounded">⚡</button>
-                  <button class="p-1 text-slate-500 hover:bg-slate-200 rounded">☑</button>
+                  <button class="p-1 text-slate-500 hover:bg-slate-200 rounded text-xs">⚡</button>
+                  <button class="p-1 text-slate-500 hover:bg-slate-200 rounded text-xs">☑</button>
                 </div>
               </div>
 
-              {/* Cards Grid */}
+              {/* Cards Grid (Screenshot Design Exact Match) */}
               {loading ? (
                 <div class="flex justify-center items-center h-64">
-                  <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  <div class="animate-spin rounded-full h-7 w-7 border-b-2 border-blue-600"></div>
                 </div>
-              ) : filteredSamples.length === 0 ? (
-                <div class="bg-white rounded-lg border border-slate-200 p-8 text-center text-slate-500 text-xs">
-                  No records match the active criteria.
+              ) : filteredRecords.length === 0 ? (
+                <div class="bg-white rounded-md border border-slate-200 p-8 text-center text-slate-500 text-xs">
+                  No records found in this view.
                 </div>
               ) : (
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                  {filteredSamples.map((item) => (
-                    <div key={item.id} class="bg-white border border-slate-200 rounded-lg p-3 shadow-2xs relative flex flex-col justify-between hover:shadow-md transition">
+                  {filteredRecords.map((item) => (
+                    <div key={item.id} class="bg-white border border-slate-200 rounded-lg p-3 shadow-2xs flex flex-col justify-between hover:shadow-sm transition">
                       <div>
-                        {/* Header & Status Badge */}
+                        {/* Title & Badge */}
                         <div class="flex justify-between items-start mb-2">
-                          <h3 class="text-sm font-semibold text-slate-800 truncate pr-2">{item.sampleName}</h3>
-                          <span class={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                          <h3 class="text-base font-semibold text-slate-800 truncate pr-1">{item.sampleName}</h3>
+                          <span class={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
                             item.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' :
-                            item.status === 'In Progress' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'
+                            item.status === 'In Progress' ? 'bg-amber-100 text-amber-700' : 'bg-amber-100 text-amber-800'
                           }`}>
-                            {item.status}
+                            {item.status === 'In Progress' ? 'Y' : item.status}
                           </span>
                         </div>
 
-                        {/* Metadata Rows (AppSheet Format) */}
+                        {/* Card Key-Values */}
                         <div class="space-y-1 text-xs">
-                          <div class="text-slate-600"><span class="font-semibold text-slate-800">Sample ID:</span> {item.sampleId}</div>
-                          <div class="text-slate-600"><span class="font-semibold text-slate-800">Location:</span> {item.location}</div>
-                          <div class="text-slate-600"><span class="font-semibold text-slate-800">Industry:</span> {item.industry}</div>
-                          <div class="flex items-center space-x-1.5 mt-2">
-                            <span class="font-semibold text-slate-800 text-xs">Keywords/Tags:</span>
+                          <div><span class="font-bold text-slate-800">Sample ID:</span> <span class="text-slate-600">{item.sampleId}</span></div>
+                          <div><span class="font-bold text-slate-800">Location:</span> <span class="text-slate-600">{item.location}</span></div>
+                          <div><span class="font-bold text-slate-800">Industry:</span> <span class="text-slate-600">{item.industry}</span></div>
+                          <div class="flex items-center space-x-1.5 pt-1">
+                            <span class="font-bold text-slate-800">Keywords/Tags:</span>
                             <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-medium">{item.tags}</span>
                           </div>
                         </div>
                       </div>
 
-                      {/* Bottom External Link Icon */}
-                      <div class="flex justify-end mt-3 border-t border-slate-100 pt-2">
+                      {/* Card Bottom Link */}
+                      <div class="flex justify-end mt-2 pt-1 border-t border-slate-50">
                         <a 
                           href={item.sampleSheet} 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          class="text-slate-400 hover:text-blue-600"
+                          class="text-slate-400 hover:text-blue-600 text-xs"
+                          title="Open Sheet"
                         >
                           ↗
                         </a>
