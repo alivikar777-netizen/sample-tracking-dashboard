@@ -247,20 +247,50 @@
         let headerIndex = -1;
         let colMap = { id: -1, name: -1, url: -1, clientReq: -1, tags: -1, industry: -1, location: -1, status: -1 };
 
+        // Normalize headers aggressively so values such as "Keywords / Tags",
+        // "Sample-Name" and "Sample Sheet URL" are all detected correctly.
         const normaliseHeader = (value) => String(value || "")
           .toLowerCase()
-          .replace(/[._-]+/g, " ")
+          .replace(/&/g, " and ")
+          .replace(/[^a-z0-9]+/g, " ")
           .replace(/\s+/g, " ")
           .trim();
 
-        const isIdHeader = (c) => /^(id|sample id|sample no|sample number|sr no|sr no\.|serial no|serial number|s no|s\. no\.)$/.test(c);
-        const isNameHeader = (c) => /^(name|sample|samples|sample name|sample title|title|project name|list name)$/.test(c);
-        const isUrlHeader = (c) => /^(url|link|sheet|sheet url|sheet link|sample url|sample link|sample sheet|sample sheet url|sample sheet link)$/.test(c) || c.includes('spreadsheet');
-        const isClientReqHeader = (c) => c === 'requirement' || c === 'client requirement' || c.includes('client req');
-        const isTagsHeader = (c) => /^(tag|tags|keyword|keywords|keywords tags|keyword tags)$/.test(c);
-        const isIndustryHeader = (c) => /^(industry|category|industry category)$/.test(c);
-        const isLocationHeader = (c) => /^(location|country|state|city|region|geography)$/.test(c);
-        const isStatusHeader = (c) => /^(status|project status|stage)$/.test(c);
+        const hasWord = (text, word) => (` ${text} `).includes(` ${word} `);
+
+        const isIdHeader = (c) => [
+          'id', 'sample id', 'sample no', 'sample number', 'sr no',
+          'serial no', 'serial number', 's no'
+        ].includes(c);
+
+        const isNameHeader = (c) =>
+          ['name', 'sample', 'samples', 'sample name', 'sample title', 'title', 'project name', 'list name'].includes(c) ||
+          (hasWord(c, 'sample') && (hasWord(c, 'name') || hasWord(c, 'title')));
+
+        const isUrlHeader = (c) =>
+          ['url', 'link', 'sheet', 'sheet url', 'sheet link', 'sample url', 'sample link',
+           'sample sheet', 'sample sheet url', 'sample sheet link'].includes(c) ||
+          hasWord(c, 'url') || hasWord(c, 'link') || hasWord(c, 'spreadsheet') ||
+          (hasWord(c, 'sheet') && !hasWord(c, 'status'));
+
+        const isClientReqHeader = (c) =>
+          c === 'requirement' || c === 'client requirement' ||
+          (hasWord(c, 'client') && (hasWord(c, 'requirement') || hasWord(c, 'req')));
+
+        const isTagsHeader = (c) =>
+          ['tag', 'tags', 'keyword', 'keywords', 'keywords tags', 'keyword tags'].includes(c) ||
+          hasWord(c, 'tag') || hasWord(c, 'tags') || hasWord(c, 'keyword') || hasWord(c, 'keywords');
+
+        const isIndustryHeader = (c) =>
+          ['industry', 'category', 'industry category'].includes(c) || hasWord(c, 'industry');
+
+        const isLocationHeader = (c) =>
+          ['location', 'country', 'state', 'city', 'region', 'geography'].includes(c) ||
+          hasWord(c, 'location') || hasWord(c, 'country');
+
+        const isStatusHeader = (c) =>
+          ['status', 'project status', 'stage'].includes(c) ||
+          (hasWord(c, 'project') && hasWord(c, 'status'));
 
         const mapHeaderRow = (row) => {
           const map = { id: -1, name: -1, url: -1, clientReq: -1, tags: -1, industry: -1, location: -1, status: -1 };
@@ -270,6 +300,8 @@
             const c = normaliseHeader(cell);
             if (!c) return;
 
+            // Exact/controlled ID matching only. Do NOT use c.includes('no'),
+            // because that can incorrectly match columns such as Phone Number.
             if (map.id === -1 && isIdHeader(c)) { map.id = colIdx; score++; }
             if (map.name === -1 && isNameHeader(c)) { map.name = colIdx; score++; }
             if (map.url === -1 && isUrlHeader(c)) { map.url = colIdx; score++; }
@@ -283,11 +315,10 @@
           return { map, score };
         };
 
-        // Search the first 10 rows and choose the row with the strongest header match.
-        // Requiring at least two recognised fields prevents a normal data row containing
-        // words such as "sample", "location" or "title" from being mistaken for a header.
+        // Google Sheets may have title/blank rows before the real header.
+        // Check a wider range and pick the strongest matching header row.
         let bestHeader = null;
-        for (let i = 0; i < Math.min(10, rawRows.length); i++) {
+        for (let i = 0; i < Math.min(20, rawRows.length); i++) {
           const candidate = mapHeaderRow(rawRows[i]);
           if (!bestHeader || candidate.score > bestHeader.score) {
             bestHeader = { ...candidate, index: i };
@@ -297,9 +328,45 @@
         if (bestHeader && bestHeader.score >= 2) {
           headerIndex = bestHeader.index;
           colMap = bestHeader.map;
+        } else {
+          // Compatibility fallback for sheets with unusual header labels.
+          // This keeps the old dashboard behaviour without reintroducing the
+          // dangerous broad ID matching bug.
+          for (let i = 0; i < Math.min(20, rawRows.length); i++) {
+            const normalized = rawRows[i].map(normaliseHeader);
+            const joined = normalized.join(' ');
+            const looksLikeHeader =
+              (joined.includes('sample') || joined.includes('name') || joined.includes('title')) &&
+              (joined.includes('link') || joined.includes('url') || joined.includes('sheet') ||
+               joined.includes('location') || joined.includes('industry') || joined.includes('keyword') || joined.includes('tag'));
+
+            if (!looksLikeHeader) continue;
+
+            headerIndex = i;
+            rawRows[i].forEach((cell, colIdx) => {
+              const c = normaliseHeader(cell);
+              if (colMap.id === -1 && isIdHeader(c)) colMap.id = colIdx;
+              if (colMap.name === -1 && (isNameHeader(c) || c.includes('sample name'))) colMap.name = colIdx;
+              if (colMap.url === -1 && isUrlHeader(c)) colMap.url = colIdx;
+              if (colMap.clientReq === -1 && isClientReqHeader(c)) colMap.clientReq = colIdx;
+              if (colMap.tags === -1 && isTagsHeader(c)) colMap.tags = colIdx;
+              if (colMap.industry === -1 && isIndustryHeader(c)) colMap.industry = colIdx;
+              if (colMap.location === -1 && isLocationHeader(c)) colMap.location = colIdx;
+              if (colMap.status === -1 && isStatusHeader(c)) colMap.status = colIdx;
+            });
+            break;
+          }
         }
 
-        const startIndex = headerIndex >= 0 ? headerIndex + 1 : 0;
+        // If no header could be recognized, returning rows with guessed columns
+        // causes exactly the date/name mismatch seen in the broken version.
+        // Fail safely instead of displaying misleading cards.
+        if (headerIndex === -1 || colMap.name === -1) {
+          console.warn(`Header not recognized for tab: ${tabName}`, rawRows.slice(0, 5));
+          return [];
+        }
+
+        const startIndex = headerIndex + 1;
         const targetRows = rawRows.slice(startIndex);
 
         return targetRows
@@ -307,14 +374,12 @@
           .map((row, idx) => {
             const getVal = (colIdx) => (colIdx >= 0 && row[colIdx] != null) ? String(row[colIdx]).trim() : '';
 
-            const firstNonUrlCell = row.find(cell => {
-              const value = String(cell || '').trim();
-              return value && !/^(https?:\/\/|docs\.google\.com|sheets\.google\.com)/i.test(value);
-            });
-            const rawName = getVal(colMap.name) || (firstNonUrlCell ? String(firstNonUrlCell).trim() : `Sample Record ${idx + 1}`);
-            const sampleId = getVal(colMap.id);
+            const rawName = getVal(colMap.name);
+            if (!rawName) return null;
 
+            const sampleId = getVal(colMap.id);
             let rawSheetUrl = getVal(colMap.url);
+
             if (!cleanUrl(rawSheetUrl)) {
               const foundUrlCell = row.find(cell => cleanUrl(cell));
               if (foundUrlCell) rawSheetUrl = String(foundUrlCell);
@@ -332,7 +397,8 @@
               location: getVal(colMap.location),
               projectStatus: getVal(colMap.status)
             };
-          });
+          })
+          .filter(Boolean);
       };
 
       const currentScopeSamples = useMemo(() => {
