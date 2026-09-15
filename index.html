@@ -55,7 +55,7 @@
 
     function App() {
       const [activeTab, setActiveTab] = useState(SHEET_TABS[0]);
-      const [samples, setSamples] = useState([]);
+      const [allTabsData, setAllTabsData] = useState({});
       const [loading, setLoading] = useState(true);
       const [globalSearch, setGlobalSearch] = useState("");
 
@@ -81,9 +81,10 @@
       const [industrySearch, setIndustrySearch] = useState("");
       const [tagSearch, setTagSearch] = useState("");
 
+      // Fetch all tabs data initially to allow instant global search across all 12 tabs
       useEffect(() => {
-        fetchSheetData(activeTab);
-      }, [activeTab]);
+        fetchAllTabsData();
+      }, []);
 
       const toggleSection = (section) => {
         setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
@@ -94,16 +95,12 @@
         return num.toString();
       };
 
-      // Strict URL extractor to prevent master sheet fallback when specific link is available
       const cleanUrl = (rawStr) => {
         if (!rawStr) return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`;
         let str = String(rawStr).trim();
-        
-        // Extract HTTP/HTTPS links inside cells
         const urlMatch = str.match(/https?:\/\/[^\s"']+/i);
         if (urlMatch) return urlMatch[0];
 
-        // Match Google Docs links without http
         if (str.includes('docs.google.com') || str.includes('spreadsheets')) {
           if (!str.startsWith('http')) return 'https://' + str;
           return str;
@@ -112,42 +109,50 @@
         return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`;
       };
 
-      const fetchSheetData = (tabName) => {
+      const fetchAllTabsData = () => {
         setLoading(true);
         const cacheBuster = new Date().getTime();
-        const sheetParam = tabName === "All Samples" ? "" : `&sheet=${encodeURIComponent(tabName)}`;
-        const gvizUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv${sheetParam}&_=${cacheBuster}`;
+        let loadedData = {};
+        let fetchCount = 0;
 
-        Papa.parse(gvizUrl, {
-          download: true,
-          header: false,
-          skipEmptyLines: 'greedy',
-          complete: (results) => {
-            if (results.data && results.data.length > 0) {
-              parseRows(results.data, tabName);
-            } else {
-              setSamples([]);
-              setLoading(false);
+        SHEET_TABS.forEach(tabName => {
+          const sheetParam = `&sheet=${encodeURIComponent(tabName)}`;
+          const gvizUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv${sheetParam}&_=${cacheBuster}`;
+
+          Papa.parse(gvizUrl, {
+            download: true,
+            header: false,
+            skipEmptyLines: 'greedy',
+            complete: (results) => {
+              if (results.data && results.data.length > 0) {
+                loadedData[tabName] = parseRows(results.data, tabName);
+              } else {
+                loadedData[tabName] = [];
+              }
+              fetchCount++;
+              if (fetchCount === SHEET_TABS.length) {
+                setAllTabsData(loadedData);
+                setLoading(false);
+              }
+            },
+            error: () => {
+              loadedData[tabName] = [];
+              fetchCount++;
+              if (fetchCount === SHEET_TABS.length) {
+                setAllTabsData(loadedData);
+                setLoading(false);
+              }
             }
-          },
-          error: () => {
-            setSamples([]);
-            setLoading(false);
-          }
+          });
         });
       };
 
       const parseRows = (rawRows, tabName) => {
-        if (!rawRows || rawRows.length === 0) {
-          setSamples([]);
-          setLoading(false);
-          return;
-        }
+        if (!rawRows || rawRows.length === 0) return [];
 
         let headerIndex = -1;
         let colMap = { id: -1, name: -1, url: -1, clientReq: -1, tags: -1, industry: -1, location: -1 };
 
-        // Precise Header Detection across first 10 rows
         for (let i = 0; i < Math.min(10, rawRows.length); i++) {
           const rowStr = rawRows[i].map(c => String(c).toLowerCase()).join(' ');
           if (rowStr.includes('sample') || rowStr.includes('name') || rowStr.includes('location') || rowStr.includes('link') || rowStr.includes('url') || rowStr.includes('title')) {
@@ -171,13 +176,12 @@
         const startIndex = headerIndex >= 0 ? headerIndex + 1 : 0;
         const targetRows = rawRows.slice(startIndex);
 
-        const formatted = targetRows.filter(row => row.some(cell => String(cell).trim() !== '')).map((row, idx) => {
+        return targetRows.filter(row => row.some(cell => String(cell).trim() !== '')).map((row, idx) => {
           const getVal = (colIdx) => (colIdx >= 0 && row[colIdx]) ? String(row[colIdx]).trim() : '';
 
           const rawName = getVal(colMap.name) || (row[0] && !String(row[0]).includes('http') ? String(row[0]).trim() : `Sample Record ${idx + 1}`);
           const sampleId = getVal(colMap.id) || rawName;
           
-          // Search whole row for actual Google Sheet / Web Link if column map fails or yields plain text
           let rawSheetUrl = getVal(colMap.url);
           if (!rawSheetUrl || !rawSheetUrl.includes('http')) {
             const foundUrlCell = row.find(c => String(c).includes('http') || String(c).includes('docs.google.com') || String(c).includes('spreadsheets'));
@@ -186,7 +190,6 @@
             }
           }
 
-          // Strict column binding - no fake data generated
           const location = getVal(colMap.location);
           const industry = getVal(colMap.industry);
           const tags = getVal(colMap.tags);
@@ -194,6 +197,7 @@
 
           return {
             id: `${tabName}-${idx}`,
+            tabName: tabName,
             sampleId,
             sampleName: rawName,
             sampleSheet: cleanUrl(rawSheetUrl),
@@ -204,35 +208,40 @@
             projectStatus: 'Completed'
           };
         });
-
-        setSamples(formatted);
-        setLoading(false);
       };
+
+      // Current scope samples (All tabs if global search query exists, else active tab)
+      const currentScopeSamples = useMemo(() => {
+        if (globalSearch.trim() !== "") {
+          return Object.values(allTabsData).flat();
+        }
+        return allTabsData[activeTab] || [];
+      }, [allTabsData, activeTab, globalSearch]);
 
       // Aggregations for Sidebar Filters
       const locationCounts = useMemo(() => {
         const counts = {};
-        samples.forEach(s => {
+        currentScopeSamples.forEach(s => {
           if (s.location) counts[s.location] = (counts[s.location] || 0) + 1;
         });
         return counts;
-      }, [samples]);
+      }, [currentScopeSamples]);
 
       const industryCounts = useMemo(() => {
         const counts = {};
-        samples.forEach(s => {
+        currentScopeSamples.forEach(s => {
           if (s.industry) counts[s.industry] = (counts[s.industry] || 0) + 1;
         });
         return counts;
-      }, [samples]);
+      }, [currentScopeSamples]);
 
       const tagCounts = useMemo(() => {
         const counts = {};
-        samples.forEach(s => {
+        currentScopeSamples.forEach(s => {
           if (s.tags) counts[s.tags] = (counts[s.tags] || 0) + 1;
         });
         return counts;
-      }, [samples]);
+      }, [currentScopeSamples]);
 
       // Filtered lists for sidebar
       const filteredLocations = useMemo(() => {
@@ -281,16 +290,17 @@
         }
       };
 
-      // Main Filtered Data
+      // Main Filtered Results
       const filteredSamples = useMemo(() => {
-        return samples.filter(item => {
-          const search = globalSearch.toLowerCase();
-          const matchesGlobalSearch = 
+        return currentScopeSamples.filter(item => {
+          const search = globalSearch.toLowerCase().trim();
+          const matchesGlobalSearch = search === "" || 
             (item.sampleName && item.sampleName.toLowerCase().includes(search)) ||
             (item.sampleId && item.sampleId.toLowerCase().includes(search)) ||
             (item.location && item.location.toLowerCase().includes(search)) ||
             (item.industry && item.industry.toLowerCase().includes(search)) ||
-            (item.tags && item.tags.toLowerCase().includes(search));
+            (item.tags && item.tags.toLowerCase().includes(search)) ||
+            (item.tabName && item.tabName.toLowerCase().includes(search));
 
           const matchesLocation = selectedLocations.length === 0 || (item.location && selectedLocations.includes(item.location));
           const matchesIndustry = selectedIndustries.length === 0 || (item.industry && selectedIndustries.includes(item.industry));
@@ -298,7 +308,7 @@
 
           return matchesGlobalSearch && matchesLocation && matchesIndustry && matchesTags;
         });
-      }, [samples, globalSearch, selectedLocations, selectedIndustries, selectedTags]);
+      }, [currentScopeSamples, globalSearch, selectedLocations, selectedIndustries, selectedTags]);
 
       const toggleFilter = (item, list, setList) => {
         setList(prev => prev.includes(item) ? prev.filter(x => x !== item) : [...prev, item]);
@@ -306,6 +316,7 @@
 
       const handleTabChange = (tab) => {
         setActiveTab(tab);
+        setGlobalSearch(""); // Reset search when switching tab explicitly
         setSelectedLocations([]);
         setSelectedIndustries([]);
         setSelectedTags([]);
@@ -328,7 +339,7 @@
                 <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-sm">🔍</span>
                 <input
                   type="text"
-                  placeholder="Search Sample Tracking Database"
+                  placeholder="Search across all 12 tabs..."
                   value={globalSearch}
                   onChange={(e) => setGlobalSearch(e.target.value)}
                   class="w-full pl-9 pr-4 py-1.5 bg-slate-100/80 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-500"
@@ -338,7 +349,7 @@
 
             <div class="flex items-center space-x-2 text-xs text-slate-500">
               <span>Sync complete</span>
-              <button onClick={() => fetchSheetData(activeTab)} class="p-1.5 hover:bg-slate-100 rounded-full border border-slate-200" title="Refresh Data">🔄</button>
+              <button onClick={fetchAllTabsData} class="p-1.5 hover:bg-slate-100 rounded-full border border-slate-200" title="Refresh Data">🔄</button>
             </div>
           </header>
 
@@ -346,7 +357,7 @@
           <div class="bg-white border-b border-slate-200 px-6 overflow-x-auto whitespace-nowrap shadow-2xs">
             <div class="flex space-x-1 py-1">
               {SHEET_TABS.map((tab) => {
-                const isActive = activeTab === tab;
+                const isActive = activeTab === tab && globalSearch.trim() === "";
                 return (
                   <button
                     key={tab}
@@ -382,10 +393,9 @@
                   {openSections.location && (
                     <div class="space-y-2 mt-2">
                       {filteredLocations.length === 0 ? (
-                        <p class="text-xs text-slate-400 italic">No locations in this tab</p>
+                        <p class="text-xs text-slate-400 italic">No locations available</p>
                       ) : (
                         <>
-                          {/* Select All Option */}
                           <label class="flex items-center justify-between text-xs text-blue-600 font-semibold cursor-pointer hover:bg-blue-50 p-1 rounded border-b border-slate-100 mb-1">
                             <div class="flex items-center gap-2">
                               <input 
@@ -452,10 +462,9 @@
                   {openSections.industry && (
                     <div class="space-y-2 mt-2">
                       {filteredIndustries.length === 0 ? (
-                        <p class="text-xs text-slate-400 italic">No industries in this tab</p>
+                        <p class="text-xs text-slate-400 italic">No industries available</p>
                       ) : (
                         <>
-                          {/* Select All Option */}
                           <label class="flex items-center justify-between text-xs text-blue-600 font-semibold cursor-pointer hover:bg-blue-50 p-1 rounded border-b border-slate-100 mb-1">
                             <div class="flex items-center gap-2">
                               <input 
@@ -522,10 +531,9 @@
                   {openSections.tags && (
                     <div class="space-y-2 mt-2">
                       {filteredTagsList.length === 0 ? (
-                        <p class="text-xs text-slate-400 italic">No tags in this tab</p>
+                        <p class="text-xs text-slate-400 italic">No tags available</p>
                       ) : (
                         <>
-                          {/* Select All Option */}
                           <label class="flex items-center justify-between text-xs text-blue-600 font-semibold cursor-pointer hover:bg-blue-50 p-1 rounded border-b border-slate-100 mb-1">
                             <div class="flex items-center gap-2">
                               <input 
@@ -582,21 +590,21 @@
               </div>
             </aside>
 
-            {/* Main Content */}
+            {/* Main Content Area */}
             <main class="flex-1 p-6 overflow-y-auto">
               <div class="mb-4 flex items-center justify-between">
                 <h2 class="text-sm font-semibold text-slate-700">
-                  {activeTab} ({filteredSamples.length})
+                  {globalSearch.trim() !== "" ? `Search Results across All Tabs` : activeTab} ({filteredSamples.length})
                 </h2>
               </div>
 
               {loading ? (
                 <div class="flex justify-center items-center py-24 text-slate-400 text-sm">
-                  Loading records...
+                  Loading database records...
                 </div>
               ) : filteredSamples.length === 0 ? (
                 <div class="bg-white border border-slate-200 rounded-xl p-10 text-center text-slate-400 text-sm">
-                  No samples found matching selected filters.
+                  No samples found matching selected query or filters.
                 </div>
               ) : (
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -606,7 +614,7 @@
                       class="bg-white rounded-xl border border-slate-200/90 p-4 shadow-sm hover:shadow-md transition relative flex flex-col justify-between"
                     >
                       <div>
-                        {/* Title & Badge */}
+                        {/* Title & Tab Indicator Badge */}
                         <div class="flex justify-between items-start mb-2">
                           <h3 class="text-base font-bold text-slate-900 leading-tight">
                             {sample.sampleName}
@@ -615,6 +623,15 @@
                             Completed
                           </span>
                         </div>
+
+                        {/* Search Source Tab Label (visible when global searching) */}
+                        {globalSearch.trim() !== "" && (
+                          <div class="mb-2">
+                            <span class="bg-slate-100 text-slate-600 text-[10px] font-semibold px-2 py-0.5 rounded">
+                              📁 {sample.tabName}
+                            </span>
+                          </div>
+                        )}
 
                         {/* Detail Card Fields */}
                         <div class="space-y-1 my-3 text-xs">
