@@ -57,20 +57,29 @@
       const [activeTab, setActiveTab] = useState(SHEET_TABS[0]);
       const [samples, setSamples] = useState([]);
       const [loading, setLoading] = useState(true);
-      const [searchTerm, setSearchTerm] = useState("");
-      const [tagSearchTerm, setTagSearchTerm] = useState("");
-      
-      // Filter states
-      const [selectedStatus, setSelectedStatus] = useState([]);
+      const [globalSearch, setGlobalSearch] = useState("");
+
+      // Filter selections
       const [selectedLocations, setSelectedLocations] = useState([]);
       const [selectedIndustries, setSelectedIndustries] = useState([]);
+      const [selectedTags, setSelectedTags] = useState([]);
 
       // Section open/close states
       const [openSections, setOpenSections] = useState({
-        status: true,
         location: true,
-        industry: true
+        industry: true,
+        tags: true
       });
+
+      // Expand/Collapse "See More" states
+      const [showAllLocations, setShowAllLocations] = useState(false);
+      const [showAllIndustries, setShowAllIndustries] = useState(false);
+      const [showAllTags, setShowAllTags] = useState(false);
+
+      // Search queries for individual filters
+      const [locationSearch, setLocationSearch] = useState("");
+      const [industrySearch, setIndustrySearch] = useState("");
+      const [tagSearch, setTagSearch] = useState("");
 
       useEffect(() => {
         fetchSheetData(activeTab);
@@ -140,7 +149,7 @@
         }
 
         let headerIndex = -1;
-        let colMap = { id: 0, project: 1, name: 3, url: 4, clientReq: 5, tags: 8, industry: 9, location: 10 };
+        let colMap = { id: 0, name: 3, url: 4, clientReq: 5, tags: 8, industry: 9, location: 10 };
 
         for (let i = 0; i < Math.min(5, rawRows.length); i++) {
           const rowStr = rawRows[i].map(c => String(c).toLowerCase()).join(' ');
@@ -149,7 +158,6 @@
             rawRows[i].forEach((cell, colIdx) => {
               const c = String(cell).toLowerCase().trim();
               if (c.includes('id')) colMap.id = colIdx;
-              if (c.includes('project') || c.includes('status')) colMap.project = colIdx;
               if (c.includes('name') || c.includes('title')) colMap.name = colIdx;
               if (c.includes('link') || c.includes('url') || c.includes('sheet')) colMap.url = colIdx;
               if (c.includes('req') || c.includes('client')) colMap.clientReq = colIdx;
@@ -170,28 +178,28 @@
           const sampleName = getVal(colMap.name) || getVal(0) || `Sample ${sampleId}`;
           const rawSheetUrl = getVal(colMap.url) || row.find(c => String(c).includes('http')) || '';
           const clientReq = getVal(colMap.clientReq) || '-';
-          const tags = getVal(colMap.tags) || '-';
 
-          // Status detection
-          let projectStatus = getVal(colMap.project);
-          if (!projectStatus || projectStatus === 'Yes') projectStatus = idx % 3 === 0 ? 'Completed' : (idx % 3 === 1 ? 'In Progress' : 'Paused');
-
-          // Location detection
           let location = getVal(colMap.location);
           if (!location || location === '-') {
             const words = sampleName.split(' ');
             if (words.length > 1 && words[words.length - 1] === words[words.length - 1].toUpperCase()) {
               location = words[words.length - 1];
             } else {
-              location = idx % 2 === 0 ? 'USA' : 'India';
+              location = idx % 3 === 0 ? 'USA' : (idx % 3 === 1 ? 'UK' : 'Germany');
             }
           }
 
-          // Industry detection
           let industry = getVal(colMap.industry);
           if (!industry || industry === '-') {
             industry = idx % 2 === 0 ? 'Education & Training' : 'Medical & Pharma';
           }
+
+          let tags = getVal(colMap.tags);
+          if (!tags || tags === '-') {
+            tags = location;
+          }
+
+          const projectStatus = idx % 3 === 0 ? 'Completed' : (idx % 3 === 1 ? 'In Progress' : 'Paused');
 
           return {
             id: `${tabName}-${idx}`,
@@ -199,7 +207,7 @@
             sampleName,
             sampleSheet: extractUrl(rawSheetUrl),
             clientRequirement: clientReq,
-            tags: tags !== '-' ? tags : location,
+            tags,
             industry,
             location,
             projectStatus
@@ -210,7 +218,7 @@
         setLoading(false);
       };
 
-      // CalculateCounts for Sidebar
+      // Aggregated counts for sidebar filters
       const locationCounts = useMemo(() => {
         const counts = {};
         samples.forEach(s => {
@@ -227,36 +235,64 @@
         return counts;
       }, [samples]);
 
-      const statusCounts = useMemo(() => {
+      const tagCounts = useMemo(() => {
         const counts = {};
         samples.forEach(s => {
-          if (s.projectStatus) counts[s.projectStatus] = (counts[s.projectStatus] || 0) + 1;
+          if (s.tags) counts[s.tags] = (counts[s.tags] || 0) + 1;
         });
         return counts;
       }, [samples]);
 
-      // Filtered output
+      // Filtered lists for sidebar
+      const filteredLocations = useMemo(() => {
+        return Object.keys(locationCounts).filter(loc => 
+          loc.toLowerCase().includes(locationSearch.toLowerCase())
+        );
+      }, [locationCounts, locationSearch]);
+
+      const filteredIndustries = useMemo(() => {
+        return Object.keys(industryCounts).filter(ind => 
+          ind.toLowerCase().includes(industrySearch.toLowerCase())
+        );
+      }, [industryCounts, industrySearch]);
+
+      const filteredTagsList = useMemo(() => {
+        return Object.keys(tagCounts).filter(tag => 
+          tag.toLowerCase().includes(tagSearch.toLowerCase())
+        );
+      }, [tagCounts, tagSearch]);
+
+      // Main Filtered Data
       const filteredSamples = useMemo(() => {
         return samples.filter(item => {
-          const search = searchTerm.toLowerCase();
-          const matchesSearch = 
+          const search = globalSearch.toLowerCase();
+          const matchesGlobalSearch = 
             (item.sampleName && item.sampleName.toLowerCase().includes(search)) ||
             (item.sampleId && item.sampleId.toLowerCase().includes(search)) ||
             (item.location && item.location.toLowerCase().includes(search)) ||
             (item.industry && item.industry.toLowerCase().includes(search)) ||
             (item.tags && item.tags.toLowerCase().includes(search));
 
-          const matchesStatus = selectedStatus.length === 0 || selectedStatus.includes(item.projectStatus);
           const matchesLocation = selectedLocations.length === 0 || selectedLocations.includes(item.location);
           const matchesIndustry = selectedIndustries.length === 0 || selectedIndustries.includes(item.industry);
-          const matchesTagSearch = !tagSearchTerm || item.tags.toLowerCase().includes(tagSearchTerm.toLowerCase());
+          const matchesTags = selectedTags.length === 0 || selectedTags.includes(item.tags);
 
-          return matchesSearch && matchesStatus && matchesLocation && matchesIndustry && matchesTagSearch;
+          return matchesGlobalSearch && matchesLocation && matchesIndustry && matchesTags;
         });
-      }, [samples, searchTerm, selectedStatus, selectedLocations, selectedIndustries, tagSearchTerm]);
+      }, [samples, globalSearch, selectedLocations, selectedIndustries, selectedTags]);
 
       const toggleFilter = (item, list, setList) => {
         setList(prev => prev.includes(item) ? prev.filter(x => x !== item) : [...prev, item]);
+      };
+
+      const handleTabChange = (tab) => {
+        setActiveTab(tab);
+        setSelectedLocations([]);
+        setSelectedIndustries([]);
+        setSelectedTags([]);
+        setLocationSearch("");
+        setIndustrySearch("");
+        setTagSearch("");
       };
 
       return (
@@ -268,15 +304,14 @@
               <h1 class="text-base font-semibold text-slate-800">Sample Tracking Dashboard</h1>
             </div>
 
-            {/* Top Search Bar */}
             <div class="flex-1 max-w-xl">
               <div class="relative">
                 <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-sm">🔍</span>
                 <input
                   type="text"
                   placeholder="Search Sample Tracking Database"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  value={globalSearch}
+                  onChange={(e) => setGlobalSearch(e.target.value)}
                   class="w-full pl-9 pr-4 py-1.5 bg-slate-100/80 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-500"
                 />
               </div>
@@ -284,58 +319,38 @@
 
             <div class="flex items-center space-x-2 text-xs text-slate-500">
               <span>Sync complete</span>
-              <button onClick={() => fetchSheetData(activeTab)} class="p-1.5 hover:bg-slate-100 rounded-full border border-slate-200">🔄</button>
+              <button onClick={() => fetchSheetData(activeTab)} class="p-1.5 hover:bg-slate-100 rounded-full border border-slate-200" title="Refresh Data">🔄</button>
             </div>
           </header>
+
+          {/* 12 Tabs Bar */}
+          <div class="bg-white border-b border-slate-200 px-6 overflow-x-auto whitespace-nowrap shadow-2xs scrollbar-none">
+            <div class="flex space-x-1 py-1">
+              {SHEET_TABS.map((tab) => {
+                const isActive = activeTab === tab;
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => handleTabChange(tab)}
+                    class={`px-3 py-2 text-xs font-medium rounded-md transition ${
+                      isActive 
+                        ? 'bg-blue-50 text-blue-600 font-semibold' 
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           <div class="flex flex-1">
             {/* Sidebar Filters */}
             <aside class="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0 select-none">
               <div class="p-4 space-y-5 overflow-y-auto flex-1">
                 
-                {/* Project Status */}
-                <div class="border-b border-slate-100 pb-4">
-                  <div 
-                    onClick={() => toggleSection('status')} 
-                    class="flex justify-between items-center cursor-pointer mb-2 text-slate-800 font-semibold text-sm"
-                  >
-                    <span>Project Status</span>
-                    <span class="text-xs text-slate-400">{openSections.status ? '▲' : '▼'}</span>
-                  </div>
-
-                  {openSections.status && (
-                    <div class="space-y-2 mt-2">
-                      <label class="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
-                        <div class="flex items-center gap-2">
-                          <input 
-                            type="checkbox" 
-                            checked={selectedStatus.length === 0} 
-                            onChange={() => setSelectedStatus([])}
-                            class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
-                          />
-                          <span>All</span>
-                        </div>
-                        <span class="text-slate-400 font-mono">{samples.length}</span>
-                      </label>
-                      {Object.keys(statusCounts).map(st => (
-                        <label key={st} class="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
-                          <div class="flex items-center gap-2">
-                            <input 
-                              type="checkbox" 
-                              checked={selectedStatus.includes(st)} 
-                              onChange={() => toggleFilter(st, selectedStatus, setSelectedStatus)}
-                              class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
-                            />
-                            <span>{st}</span>
-                          </div>
-                          <span class="text-slate-400 font-mono">{formatCount(statusCounts[st])}</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Location */}
+                {/* Location Filter */}
                 <div class="border-b border-slate-100 pb-4">
                   <div 
                     onClick={() => toggleSection('location')} 
@@ -347,7 +362,7 @@
 
                   {openSections.location && (
                     <div class="space-y-2 mt-2">
-                      {Object.keys(locationCounts).map(loc => (
+                      {(showAllLocations ? filteredLocations : filteredLocations.slice(0, 5)).map(loc => (
                         <label key={loc} class="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
                           <div class="flex items-center gap-2">
                             <input 
@@ -361,12 +376,31 @@
                           <span class="text-slate-400 font-mono">{formatCount(locationCounts[loc])}</span>
                         </label>
                       ))}
+
+                      {filteredLocations.length > 5 && (
+                        <button 
+                          onClick={() => setShowAllLocations(!showAllLocations)} 
+                          class="text-xs text-blue-600 hover:underline font-medium block pt-1"
+                        >
+                          {showAllLocations ? 'See Less' : 'See More'}
+                        </button>
+                      )}
+
+                      <div class="pt-2">
+                        <input
+                          type="text"
+                          placeholder="Search location"
+                          value={locationSearch}
+                          onChange={(e) => setLocationSearch(e.target.value)}
+                          class="w-full px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
 
-                {/* Industry */}
-                <div class="pb-2">
+                {/* Industry Filter */}
+                <div class="border-b border-slate-100 pb-4">
                   <div 
                     onClick={() => toggleSection('industry')} 
                     class="flex justify-between items-center cursor-pointer mb-2 text-slate-800 font-semibold text-sm"
@@ -377,7 +411,7 @@
 
                   {openSections.industry && (
                     <div class="space-y-2 mt-2">
-                      {Object.keys(industryCounts).map(ind => (
+                      {(showAllIndustries ? filteredIndustries : filteredIndustries.slice(0, 5)).map(ind => (
                         <label key={ind} class="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
                           <div class="flex items-center gap-2">
                             <input 
@@ -391,22 +425,76 @@
                           <span class="text-slate-400 font-mono">{formatCount(industryCounts[ind])}</span>
                         </label>
                       ))}
+
+                      {filteredIndustries.length > 5 && (
+                        <button 
+                          onClick={() => setShowAllIndustries(!showAllIndustries)} 
+                          class="text-xs text-blue-600 hover:underline font-medium block pt-1"
+                        >
+                          {showAllIndustries ? 'See Less' : 'See More'}
+                        </button>
+                      )}
+
+                      <div class="pt-2">
+                        <input
+                          type="text"
+                          placeholder="Search industry"
+                          value={industrySearch}
+                          onChange={(e) => setIndustrySearch(e.target.value)}
+                          class="w-full px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
 
-                {/* Search Tags Input */}
-                <div class="pt-2">
-                  <div class="relative">
-                    <input
-                      type="text"
-                      placeholder="Search tags"
-                      value={tagSearchTerm}
-                      onChange={(e) => setTagSearchTerm(e.target.value)}
-                      class="w-full pr-8 pl-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-blue-500"
-                    />
-                    <span class="absolute right-2.5 top-2 text-slate-400 text-xs">🔍</span>
+                {/* Keywords / Tags Filter */}
+                <div class="pb-2">
+                  <div 
+                    onClick={() => toggleSection('tags')} 
+                    class="flex justify-between items-center cursor-pointer mb-2 text-slate-800 font-semibold text-sm"
+                  >
+                    <span>Keywords / Tags</span>
+                    <span class="text-xs text-slate-400">{openSections.tags ? '▲' : '▼'}</span>
                   </div>
+
+                  {openSections.tags && (
+                    <div class="space-y-2 mt-2">
+                      {(showAllTags ? filteredTagsList : filteredTagsList.slice(0, 5)).map(tag => (
+                        <label key={tag} class="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
+                          <div class="flex items-center gap-2">
+                            <input 
+                              type="checkbox" 
+                              checked={selectedTags.includes(tag)} 
+                              onChange={() => toggleFilter(tag, selectedTags, setSelectedTags)}
+                              class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
+                            />
+                            <span class="truncate max-w-[120px]">{tag}</span>
+                          </div>
+                          <span class="text-slate-400 font-mono">{formatCount(tagCounts[tag])}</span>
+                        </label>
+                      ))}
+
+                      {filteredTagsList.length > 5 && (
+                        <button 
+                          onClick={() => setShowAllTags(!showAllTags)} 
+                          class="text-xs text-blue-600 hover:underline font-medium block pt-1"
+                        >
+                          {showAllTags ? 'See Less' : 'See More'}
+                        </button>
+                      )}
+
+                      <div class="pt-2">
+                        <input
+                          type="text"
+                          placeholder="Search tags"
+                          value={tagSearch}
+                          onChange={(e) => setTagSearch(e.target.value)}
+                          class="w-full px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
               </div>
@@ -416,7 +504,7 @@
             <main class="flex-1 p-6 overflow-y-auto">
               <div class="mb-4 flex items-center justify-between">
                 <h2 class="text-sm font-semibold text-slate-700">
-                  Sample Tracking Database ({filteredSamples.length})
+                  {activeTab} ({filteredSamples.length})
                 </h2>
               </div>
 
@@ -449,7 +537,7 @@
                           </span>
                         </div>
 
-                        {/* Minimal Structured Metadata */}
+                        {/* Minimal Structured Details */}
                         <div class="space-y-1 my-3 text-xs">
                           <p class="text-slate-800"><span class="font-bold">Sample ID:</span> {sample.sampleId}</p>
                           <p class="text-slate-800"><span class="font-bold">Location:</span> {sample.location}</p>
@@ -464,20 +552,20 @@
                         </div>
                       </div>
 
-                      {/* Sheet Redirect Icon */}
+                      {/* Google Sheet Direct Link */}
                       <div class="flex justify-end pt-2 border-t border-slate-100">
                         {sample.sampleSheet ? (
                           <a 
                             href={sample.sampleSheet} 
                             target="_blank" 
                             rel="noopener noreferrer" 
-                            class="text-slate-600 hover:text-blue-600 text-sm p-1 rounded transition"
-                            title="Open Sheet"
+                            class="text-slate-600 hover:text-blue-600 text-base font-bold p-1 rounded transition"
+                            title="Open Google Sheet"
                           >
                             ↗
                           </a>
                         ) : (
-                          <span class="text-slate-300 text-sm">↗</span>
+                          <span class="text-slate-300 text-base font-bold">↗</span>
                         )}
                       </div>
                     </div>
