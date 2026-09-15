@@ -14,10 +14,20 @@
   <!-- PapaParse -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: #F1F5F9; }
-    ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #F1F5F9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #CBD5E1;
+      border-radius: 3px;
+    }
   </style>
 </head>
 <body class="bg-[#F8FAFC] text-slate-800 antialiased min-h-screen">
@@ -43,17 +53,61 @@
       "E-Commerce Samples"
     ];
 
+    // Static Fallback Data for Doctors Tab in case GViz API fails
+    const DOCTORS_FALLBACK_DATA = [
+      { name: "General Surgeon Email List", url: "https://docs.google.com/spreadsheets/d/1Qy6Dr9ZRVX7jLOSA7RInVh9IR60azNm8SLghW8YpjF8/edit?gid=1564292089#gid=1564292089" },
+      { name: "Anesthesiologist Email List", url: "https://docs.google.com/spreadsheets/d/1LeViVd3s7wrHD3DEA4ggEb0roThxbHjPAA8oz_CatFU/edit?gid=1564292089#gid=1564292089" },
+      { name: "Endocrinologist Email List", url: "https://docs.google.com/spreadsheets/d/1je9LaztidmbQ8qJo9NAXIGrOeriaV9ERh5Ln4BKKaYU/edit?gid=1564292089#gid=1564292089" },
+      { name: "Rheumatologist Email List", url: "https://docs.google.com/spreadsheets/d/1abSb4QffbLqE3v2oSgllHSKBJzd1qqPilWGo-IWSVkI/edit?gid=580190905#gid=580190905" },
+      { name: "Urologists Email List", url: "https://docs.google.com/spreadsheets/d/136O_i0eQrcPK5h0hi5bDBsaZcEmeRXXpoww08GxWWYM/edit?gid=1564292089#gid=1564292089" },
+      { name: "Pathologists email list", url: "https://docs.google.com/spreadsheets/d/1mP8byKzGhXA_BwySPQEXdona9FtHs6yIrBVpG8zTwes/edit?gid=1564292089#gid=1564292089" },
+      { name: "Pulmonologists Email List", url: "https://docs.google.com/spreadsheets/d/1phGzCW4YGkohfodTzrNVvOhR0uA7lj4p6Kov4txwdSQ/edit?gid=1564292089#gid=1564292089" },
+      { name: "Traumatologist Email List", url: "https://docs.google.com/spreadsheets/d/1W6vTrnq6avJb0LVNMD4v57KBdc9LRmPRUCQSYv5i24s/edit?gid=1564292089#gid=1564292089" },
+      { name: "Plastic Surgeons Email List", url: "https://docs.google.com/spreadsheets/d/1GKuiunYNcRKLwhoiqGcyJ4cVyZoCillRIwlPNRaffsc/edit?gid=1564292089#gid=1564292089" },
+      { name: "Hygienists Email List", url: "https://docs.google.com/spreadsheets/d/1q2HHvHqJ4mQznSTf_ps15HNXFI-TJXG_t5CYkH6Fyy/edit?gid=1564292089#gid=1564292089" },
+      { name: "Nutritionists Email List", url: "https://docs.google.com/spreadsheets/d/1qJbdMp85MkoPAGKON-sMFV7XkCxNTuZRh_Mpsr9ExE/edit?gid=1564292089#gid=1564292089" },
+      { name: "Sleep Medicine Specialists Email List", url: "https://docs.google.com/spreadsheets/d/1_-P8nUn42sljf7ko9Kek4mMuIBn6HWXYF1aEm6FyopU/edit?gid=1564292089#gid=1564292089" },
+      { name: "Hematologist Email List", url: "https://docs.google.com/spreadsheets/d/1GTQD3C1JZJJ5_Mq8dp9EXRNSYI2c4TWGRHd3wdCQrN4/edit?gid=1564292089#gid=1564292089" },
+      { name: "Audiologist Email List", url: "https://docs.google.com/spreadsheets/d/1am3ZQWcedTdD4bt6PpwN6KQUkbbq8p48-9mBXetM7k0/edit?gid=1564292089#gid=1564292089" },
+      { name: "Nephrologist Email List", url: "https://docs.google.com/spreadsheets/d/1RFV902XprUTg7PXWJenVUGrBeA9xQb-XRWY1t067IZc/edit?gid=1564292089#gid=1564292089" },
+      { name: "Neonatologist Email List", url: "https://docs.google.com/spreadsheets/d/1MPg3DHRLVWCB9i-0s4LZWOjVvGhwrGXd2e6ujziHy0E/edit?gid=1564292089#gid=1564292089" },
+      { name: "Gastroenterologist Specialist Email List", url: "https://docs.google.com/spreadsheets/d/1NFHmengOseC5qzLJROW_CqV8pepyQxCHxMyQoXZtkA/edit?gid=1564292089#gid=1564292089" },
+      { name: "Clinical Lipidologist Email List", url: "https://docs.google.com/spreadsheets/d/1woAx1TV21PNP3CEfLMIgviwX5T2-yWo1ZqlCNpHy3s/edit?gid=1564292089#gid=1564292089" },
+      { name: "Phlebotomist Email List", url: "https://docs.google.com/spreadsheets/d/1HcQT3w4OijJG2F3fgLgPWAAJ7I1EDwiTRn9u0hNi5CtA/edit?gid=1564292089#gid=1564292089" },
+      { name: "Optician Email List", url: "https://docs.google.com/spreadsheets/d/1vtBp8E18Ha3dRDREm5nB8aSajXq5Y6GUKHmeqZ6IWU/edit?gid=1564292089#gid=1564292089" },
+      { name: "Psychiatrists Email List", url: "https://docs.google.com/spreadsheets/d/1TpnwXnB6OYuuu9cio2xDjGBoOnBZW_pys4Q6G7rk/edit?gid=1564292089#gid=1564292089" },
+      { name: "Naturopathic Doctors Email List", url: "https://docs.google.com/spreadsheets/d/1OfCGC5Z3WG9d2FC2cED5HOSqSJfSV1C3_tgW7c0GVKI/edit?gid=1564292089#gid=1564292089" },
+      { name: "Neurosurgeon Email List", url: "https://docs.google.com/spreadsheets/d/1mQdQcTnfcJAFTAXtey3-09odP1ZoevxpshJBVP3A5Wo/edit?gid=1564292089#gid=1564292089" },
+      { name: "Epidemiologist Email List", url: "https://docs.google.com/spreadsheets/d/1WYDGJLcEvp69JTyyJbKkewwQO53l3NsmcXSIPr3KiWE/edit?gid=1564292089#gid=1564292089" },
+      { name: "Neuropathologist Email List", url: "https://docs.google.com/spreadsheets/d/1MdYznlmC4SG5I_X1UryrKv2I3XDlJkp1KhkWGaxflow/edit?gid=1564292089#gid=1564292089" },
+      { name: "ENT Doctor Email List", url: "https://docs.google.com/spreadsheets/d/1VjAduCWKDw6ghYePOu_OCcW3R-giHEw7v_LilkwGvLc/edit?gid=1564292089#gid=1564292089" },
+      { name: "Hypnotists Email List", url: "https://docs.google.com/spreadsheets/d/11_r3xvjZEbWiHCSgVngl6yTTY40h-C_fZehUlFNs0/edit?gid=1564292089#gid=1564292089" },
+      { name: "Medical Geneticist Email List", url: "https://docs.google.com/spreadsheets/d/15mmL8rjrcQ0TNWN8KQke6KDrngcYHb_QpnZf8jb1QAY/edit?gid=1564292089#gid=1564292089" },
+      { name: "Oral Surgeons Email List", url: "https://docs.google.com/spreadsheets/d/1Ik2AIUCMH73zUhelR6kZT_SS-tYQOrFeJm8t6ZCaawk/edit?gid=1564292089#gid=1564292089" },
+      { name: "Cosmetologists Email List", url: "https://docs.google.com/spreadsheets/d/1GBZJA2Op1kgpfF8e9X-4OHNEVt6UvpwD5OUcNZNKFo/edit?gid=1564292089#gid=1564292089" },
+      { name: "Allergist Email List", url: "https://docs.google.com/spreadsheets/d/100WVJCBCKRJCu3RsdjofUB3V-2Sla8-7sQZGMIHg_IU/edit?gid=1564292089#gid=1564292089" },
+      { name: "Osteopathic Physicians Email List", url: "https://docs.google.com/spreadsheets/d/1PGLA-I71eHDmfl6K6_4wfv4NROd0FZzeoyR06NpNPm/edit?gid=1564292089#gid=1564292089" },
+      { name: "Prosthodontist Email List", url: "https://docs.google.com/spreadsheets/d/1cCaM1R4uouKniKPwe-NWJ-uVY6fO4gRETSdhJqa4BZm/edit?gid=1564292089#gid=1564292089" }
+    ];
+
     function App() {
       const [activeTab, setActiveTab] = useState(SHEET_TABS[0]);
       const [allTabsData, setAllTabsData] = useState({});
       const [loading, setLoading] = useState(true);
       const [globalSearch, setGlobalSearch] = useState("");
 
+      // Filter selections
       const [selectedLocations, setSelectedLocations] = useState([]);
       const [selectedIndustries, setSelectedIndustries] = useState([]);
       const [selectedTags, setSelectedTags] = useState([]);
 
-      const [openSections, setOpenSections] = useState({ location: true, industry: true, tags: true });
+      // Section open/close states
+      const [openSections, setOpenSections] = useState({
+        location: true,
+        industry: true,
+        tags: true
+      });
+
       const [showAllLocations, setShowAllLocations] = useState(false);
       const [showAllIndustries, setShowAllIndustries] = useState(false);
       const [showAllTags, setShowAllTags] = useState(false);
@@ -66,14 +120,26 @@
         fetchAllTabsData();
       }, []);
 
+      const toggleSection = (section) => {
+        setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
+      };
+
+      const formatCount = (num) => {
+        if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
+        return num.toString();
+      };
+
       const cleanUrl = (rawStr) => {
         if (!rawStr) return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`;
         let str = String(rawStr).trim();
         const urlMatch = str.match(/https?:\/\/[^\s"']+/i);
         if (urlMatch) return urlMatch[0];
+
         if (str.includes('docs.google.com') || str.includes('spreadsheets')) {
-          return str.startsWith('http') ? str : 'https://' + str;
+          if (!str.startsWith('http')) return 'https://' + str;
+          return str;
         }
+
         return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`;
       };
 
@@ -93,9 +159,18 @@
             skipEmptyLines: 'greedy',
             complete: (results) => {
               if (results.data && results.data.length > 0) {
-                loadedData[tabName] = parseRows(results.data, tabName);
+                const parsed = parseRows(results.data, tabName);
+                if (tabName === "Doctors - Specialist Email List" && parsed.length === 0) {
+                  loadedData[tabName] = getDoctorsFallback();
+                } else {
+                  loadedData[tabName] = parsed;
+                }
               } else {
-                loadedData[tabName] = [];
+                if (tabName === "Doctors - Specialist Email List") {
+                  loadedData[tabName] = getDoctorsFallback();
+                } else {
+                  loadedData[tabName] = [];
+                }
               }
               fetchCount++;
               if (fetchCount === SHEET_TABS.length) {
@@ -104,7 +179,11 @@
               }
             },
             error: () => {
-              loadedData[tabName] = [];
+              if (tabName === "Doctors - Specialist Email List") {
+                loadedData[tabName] = getDoctorsFallback();
+              } else {
+                loadedData[tabName] = [];
+              }
               fetchCount++;
               if (fetchCount === SHEET_TABS.length) {
                 setAllTabsData(loadedData);
@@ -115,70 +194,84 @@
         });
       };
 
+      const getDoctorsFallback = () => {
+        return DOCTORS_FALLBACK_DATA.map((item, idx) => ({
+          id: `Doctors - Specialist Email List-${idx}`,
+          tabName: "Doctors - Specialist Email List",
+          sampleId: item.name,
+          sampleName: item.name,
+          sampleSheet: item.url,
+          clientRequirement: "",
+          tags: "",
+          industry: "",
+          location: "",
+          projectStatus: 'Completed',
+          isSimpleTwoColumn: true
+        }));
+      };
+
       const parseRows = (rawRows, tabName) => {
         if (!rawRows || rawRows.length === 0) return [];
 
-        let headerIdx = -1;
-        let colMap = { name: -1, url: -1, id: -1, clientReq: -1, tags: -1, industry: -1, location: -1 };
+        let headerIndex = -1;
+        let colMap = { id: -1, name: -1, url: -1, clientReq: -1, tags: -1, industry: -1, location: -1 };
 
-        for (let i = 0; i < Math.min(5, rawRows.length); i++) {
+        for (let i = 0; i < Math.min(10, rawRows.length); i++) {
           const rowStr = rawRows[i].map(c => String(c).toLowerCase()).join(' ');
-          if (rowStr.includes('sample') || rowStr.includes('title') || rowStr.includes('name') || rowStr.includes('link') || rowStr.includes('url')) {
-            headerIdx = i;
-            rawRows[i].forEach((cell, cIdx) => {
+          if (rowStr.includes('sample') || rowStr.includes('name') || rowStr.includes('location') || rowStr.includes('link') || rowStr.includes('url') || rowStr.includes('title')) {
+            headerIndex = i;
+            rawRows[i].forEach((cell, colIdx) => {
               const c = String(cell).toLowerCase().trim();
-              if (c.includes('id') || c.includes('sr')) colMap.id = cIdx;
-              if (c.includes('name') || c.includes('title') || c.includes('sample')) { if(colMap.name === -1) colMap.name = cIdx; }
-              if (c.includes('link') || c.includes('url') || c.includes('sheet')) colMap.url = cIdx;
-              if (c.includes('req') || c.includes('client')) colMap.clientReq = cIdx;
-              if (c.includes('tag') || c.includes('key')) colMap.tags = cIdx;
-              if (c.includes('industry')) colMap.industry = cIdx;
-              if (c.includes('location') || c.includes('country') || c.includes('state')) colMap.location = cIdx;
+              if (c.includes('id') || c.includes('sr') || c.includes('no')) colMap.id = colIdx;
+              if (c.includes('name') || c.includes('title') || c.includes('sample name') || c === 'samples' || c === 'sample') {
+                if (colMap.name === -1) colMap.name = colIdx;
+              }
+              if (c.includes('link') || c.includes('url') || c.includes('sheet')) colMap.url = colIdx;
+              if (c.includes('req') || c.includes('client')) colMap.clientReq = colIdx;
+              if (c.includes('tag') || c.includes('key')) colMap.tags = colIdx;
+              if (c.includes('industry') || c.includes('category')) colMap.industry = colIdx;
+              if (c.includes('location') || c.includes('city') || c.includes('country') || c.includes('state')) colMap.location = colIdx;
             });
             break;
           }
         }
 
-        const startIndex = headerIdx >= 0 ? headerIdx + 1 : 0;
+        const startIndex = headerIndex >= 0 ? headerIndex + 1 : 0;
         const targetRows = rawRows.slice(startIndex);
 
-        return targetRows
-          .filter(row => row.some(cell => String(cell).trim() !== ''))
-          .map((row, idx) => {
-            const getVal = (col) => (col >= 0 && row[col]) ? String(row[col]).trim() : '';
+        const isDoctorTab = tabName === "Doctors - Specialist Email List";
 
-            // Title detection logic
-            let name = getVal(colMap.name);
-            if (!name) {
-              const firstNonUrl = row.find(cell => {
-                const s = String(cell).trim();
-                return s !== '' && !s.includes('http') && !s.includes('docs.google.com');
-              });
-              name = firstNonUrl ? String(firstNonUrl).trim() : `Sample ${idx + 1}`;
+        return targetRows.filter(row => row.some(cell => String(cell).trim() !== '')).map((row, idx) => {
+          const getVal = (colIdx) => (colIdx >= 0 && row[colIdx]) ? String(row[colIdx]).trim() : '';
+
+          const rawName = getVal(colMap.name) || (row[0] && !String(row[0]).includes('http') ? String(row[0]).trim() : `Sample Record ${idx + 1}`);
+          const sampleId = getVal(colMap.id) || rawName;
+          
+          let rawSheetUrl = getVal(colMap.url);
+          if (!rawSheetUrl || !rawSheetUrl.includes('http')) {
+            const foundUrlCell = row.find(c => String(c).includes('http') || String(c).includes('docs.google.com') || String(c).includes('spreadsheets'));
+            if (foundUrlCell) {
+              rawSheetUrl = String(foundUrlCell);
             }
+          }
 
-            // URL detection logic
-            let url = getVal(colMap.url);
-            if (!url || (!url.includes('http') && !url.includes('docs.google.com'))) {
-              const foundUrl = row.find(cell => String(cell).includes('http') || String(cell).includes('docs.google.com'));
-              if (foundUrl) url = String(foundUrl);
-            }
-
-            return {
-              id: `${tabName}-${idx}`,
-              tabName: tabName,
-              sampleId: getVal(colMap.id),
-              sampleName: name,
-              sampleSheet: cleanUrl(url),
-              clientRequirement: getVal(colMap.clientReq),
-              tags: getVal(colMap.tags),
-              industry: getVal(colMap.industry),
-              location: getVal(colMap.location)
-            };
-          });
+          // Force simple 2-column mode for Doctors tab
+          return {
+            id: `${tabName}-${idx}`,
+            tabName: tabName,
+            sampleId,
+            sampleName: rawName,
+            sampleSheet: cleanUrl(rawSheetUrl),
+            clientRequirement: isDoctorTab ? "" : getVal(colMap.clientReq),
+            tags: isDoctorTab ? "" : getVal(colMap.tags),
+            industry: isDoctorTab ? "" : getVal(colMap.industry),
+            location: isDoctorTab ? "" : getVal(colMap.location),
+            projectStatus: 'Completed',
+            isSimpleTwoColumn: isDoctorTab
+          };
+        });
       };
 
-      // Current tab samples
       const currentScopeSamples = useMemo(() => {
         if (globalSearch.trim() !== "") {
           return Object.values(allTabsData).flat();
@@ -186,7 +279,7 @@
         return allTabsData[activeTab] || [];
       }, [allTabsData, activeTab, globalSearch]);
 
-      // Dynamic filter counts ONLY from current active tab/scope
+      // Aggregations for Sidebar Filters
       const locationCounts = useMemo(() => {
         const counts = {};
         currentScopeSamples.forEach(s => {
@@ -212,21 +305,54 @@
       }, [currentScopeSamples]);
 
       const filteredLocations = useMemo(() => {
-        return Object.keys(locationCounts).filter(loc => loc.toLowerCase().includes(locationSearch.toLowerCase()));
+        return Object.keys(locationCounts).filter(loc => 
+          loc.toLowerCase().includes(locationSearch.toLowerCase())
+        );
       }, [locationCounts, locationSearch]);
 
       const filteredIndustries = useMemo(() => {
-        return Object.keys(industryCounts).filter(ind => ind.toLowerCase().includes(industrySearch.toLowerCase()));
+        return Object.keys(industryCounts).filter(ind => 
+          ind.toLowerCase().includes(industrySearch.toLowerCase())
+        );
       }, [industryCounts, industrySearch]);
 
       const filteredTagsList = useMemo(() => {
-        return Object.keys(tagCounts).filter(tag => tag.toLowerCase().includes(tagSearch.toLowerCase()));
+        return Object.keys(tagCounts).filter(tag => 
+          tag.toLowerCase().includes(tagSearch.toLowerCase())
+        );
       }, [tagCounts, tagSearch]);
+
+      const toggleSelectAllLocations = () => {
+        const allSelected = filteredLocations.every(loc => selectedLocations.includes(loc));
+        if (allSelected) {
+          setSelectedLocations(prev => prev.filter(loc => !filteredLocations.includes(loc)));
+        } else {
+          setSelectedLocations(prev => Array.from(new Set([...prev, ...filteredLocations])));
+        }
+      };
+
+      const toggleSelectAllIndustries = () => {
+        const allSelected = filteredIndustries.every(ind => selectedIndustries.includes(ind));
+        if (allSelected) {
+          setSelectedIndustries(prev => prev.filter(ind => !filteredIndustries.includes(ind)));
+        } else {
+          setSelectedIndustries(prev => Array.from(new Set([...prev, ...filteredIndustries])));
+        }
+      };
+
+      const toggleSelectAllTags = () => {
+        const allSelected = filteredTagsList.every(tag => selectedTags.includes(tag));
+        if (allSelected) {
+          setSelectedTags(prev => prev.filter(tag => !filteredTagsList.includes(tag)));
+        } else {
+          setSelectedTags(prev => Array.from(new Set([...prev, ...filteredTagsList])));
+        }
+      };
 
       const filteredSamples = useMemo(() => {
         return currentScopeSamples.filter(item => {
           const search = globalSearch.toLowerCase().trim();
-          const matchesGlobal = search === "" || 
+          const matchesGlobalSearch = search === "" || 
             (item.sampleName && item.sampleName.toLowerCase().includes(search)) ||
             (item.sampleId && item.sampleId.toLowerCase().includes(search)) ||
             (item.location && item.location.toLowerCase().includes(search)) ||
@@ -234,11 +360,11 @@
             (item.tags && item.tags.toLowerCase().includes(search)) ||
             (item.tabName && item.tabName.toLowerCase().includes(search));
 
-          const matchesLoc = selectedLocations.length === 0 || (item.location && selectedLocations.includes(item.location));
-          const matchesInd = selectedIndustries.length === 0 || (item.industry && selectedIndustries.includes(item.industry));
-          const matchesTag = selectedTags.length === 0 || (item.tags && selectedTags.includes(item.tags));
+          const matchesLocation = selectedLocations.length === 0 || (item.location && selectedLocations.includes(item.location));
+          const matchesIndustry = selectedIndustries.length === 0 || (item.industry && selectedIndustries.includes(item.industry));
+          const matchesTags = selectedTags.length === 0 || (item.tags && selectedTags.includes(item.tags));
 
-          return matchesGlobal && matchesLoc && matchesInd && matchesTag;
+          return matchesGlobalSearch && matchesLocation && matchesIndustry && matchesTags;
         });
       }, [currentScopeSamples, globalSearch, selectedLocations, selectedIndustries, selectedTags]);
 
@@ -274,17 +400,18 @@
                   placeholder="Search across all 12 tabs..."
                   value={globalSearch}
                   onChange={(e) => setGlobalSearch(e.target.value)}
-                  class="w-full pl-9 pr-4 py-1.5 bg-slate-100 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-500"
+                  class="w-full pl-9 pr-4 py-1.5 bg-slate-100/80 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-500"
                 />
               </div>
             </div>
 
-            <button onClick={fetchAllTabsData} class="p-2 hover:bg-slate-100 rounded-lg border border-slate-200 text-xs text-slate-600 font-medium">
-              🔄 Refresh Data
-            </button>
+            <div class="flex items-center space-x-2 text-xs text-slate-500">
+              <span>Sync complete</span>
+              <button onClick={fetchAllTabsData} class="p-1.5 hover:bg-slate-100 rounded-full border border-slate-200" title="Refresh Data">🔄</button>
+            </div>
           </header>
 
-          {/* Tabs */}
+          {/* 12 Tabs Bar */}
           <div class="bg-white border-b border-slate-200 px-6 overflow-x-auto whitespace-nowrap shadow-2xs">
             <div class="flex space-x-1 py-1">
               {SHEET_TABS.map((tab) => {
@@ -308,76 +435,211 @@
 
           <div class="flex flex-1">
             {/* Sidebar Filters */}
-            <aside class="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0">
+            <aside class="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0 select-none">
               <div class="p-4 space-y-5 overflow-y-auto flex-1">
                 
-                {/* Location */}
+                {/* Location Filter */}
                 <div class="border-b border-slate-100 pb-4">
-                  <div onClick={() => setOpenSections(p => ({...p, location: !p.location}))} class="flex justify-between items-center cursor-pointer mb-2 font-semibold text-sm">
+                  <div 
+                    onClick={() => toggleSection('location')} 
+                    class="flex justify-between items-center cursor-pointer mb-2 text-slate-800 font-semibold text-sm"
+                  >
                     <span>Location</span>
                     <span class="text-xs text-slate-400">{openSections.location ? '▲' : '▼'}</span>
                   </div>
 
                   {openSections.location && (
-                    <div class="space-y-1.5 mt-2">
+                    <div class="space-y-2 mt-2">
                       {filteredLocations.length === 0 ? (
-                        <p class="text-xs text-slate-400 italic">No locations in this tab</p>
+                        <p class="text-xs text-slate-400 italic">No locations available</p>
                       ) : (
-                        (showAllLocations ? filteredLocations : filteredLocations.slice(0, 5)).map(loc => (
-                          <label key={loc} class="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
+                        <>
+                          <label class="flex items-center justify-between text-xs text-blue-600 font-semibold cursor-pointer hover:bg-blue-50 p-1 rounded border-b border-slate-100 mb-1">
                             <div class="flex items-center gap-2">
                               <input 
                                 type="checkbox" 
-                                checked={selectedLocations.includes(loc)} 
-                                onChange={() => toggleFilter(loc, selectedLocations, setSelectedLocations)}
-                                class="rounded border-slate-300 text-blue-600" 
+                                checked={filteredLocations.length > 0 && filteredLocations.every(loc => selectedLocations.includes(loc))} 
+                                onChange={toggleSelectAllLocations}
+                                class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
                               />
-                              <span class="truncate max-w-[120px]">{loc}</span>
+                              <span>Select All ({filteredLocations.length})</span>
                             </div>
-                            <span class="text-slate-400 font-mono">{locationCounts[loc]}</span>
                           </label>
-                        ))
+
+                          {(showAllLocations ? filteredLocations : filteredLocations.slice(0, 5)).map(loc => (
+                            <label key={loc} class="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
+                              <div class="flex items-center gap-2">
+                                <input 
+                                  type="checkbox" 
+                                  checked={selectedLocations.includes(loc)} 
+                                  onChange={() => toggleFilter(loc, selectedLocations, setSelectedLocations)}
+                                  class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
+                                />
+                                <span class="truncate max-w-[120px]">{loc}</span>
+                              </div>
+                              <span class="text-slate-400 font-mono">{formatCount(locationCounts[loc])}</span>
+                            </label>
+                          ))}
+                        </>
                       )}
+
                       {filteredLocations.length > 5 && (
-                        <button onClick={() => setShowAllLocations(!showAllLocations)} class="text-xs text-blue-600 hover:underline pt-1 block">
+                        <button 
+                          onClick={() => setShowAllLocations(!showAllLocations)} 
+                          class="text-xs text-blue-600 hover:underline font-medium block pt-1"
+                        >
                           {showAllLocations ? 'See Less' : 'See More'}
                         </button>
+                      )}
+
+                      {filteredLocations.length > 0 && (
+                        <div class="pt-2">
+                          <input
+                            type="text"
+                            placeholder="Search location"
+                            value={locationSearch}
+                            onChange={(e) => setLocationSearch(e.target.value)}
+                            class="w-full px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
                       )}
                     </div>
                   )}
                 </div>
 
-                {/* Industry */}
+                {/* Industry Filter */}
                 <div class="border-b border-slate-100 pb-4">
-                  <div onClick={() => setOpenSections(p => ({...p, industry: !p.industry}))} class="flex justify-between items-center cursor-pointer mb-2 font-semibold text-sm">
+                  <div 
+                    onClick={() => toggleSection('industry')} 
+                    class="flex justify-between items-center cursor-pointer mb-2 text-slate-800 font-semibold text-sm"
+                  >
                     <span>Industry</span>
                     <span class="text-xs text-slate-400">{openSections.industry ? '▲' : '▼'}</span>
                   </div>
 
                   {openSections.industry && (
-                    <div class="space-y-1.5 mt-2">
+                    <div class="space-y-2 mt-2">
                       {filteredIndustries.length === 0 ? (
-                        <p class="text-xs text-slate-400 italic">No industries in this tab</p>
+                        <p class="text-xs text-slate-400 italic">No industries available</p>
                       ) : (
-                        (showAllIndustries ? filteredIndustries : filteredIndustries.slice(0, 5)).map(ind => (
-                          <label key={ind} class="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
+                        <>
+                          <label class="flex items-center justify-between text-xs text-blue-600 font-semibold cursor-pointer hover:bg-blue-50 p-1 rounded border-b border-slate-100 mb-1">
                             <div class="flex items-center gap-2">
                               <input 
                                 type="checkbox" 
-                                checked={selectedIndustries.includes(ind)} 
-                                onChange={() => toggleFilter(ind, selectedIndustries, setSelectedIndustries)}
-                                class="rounded border-slate-300 text-blue-600" 
+                                checked={filteredIndustries.length > 0 && filteredIndustries.every(ind => selectedIndustries.includes(ind))} 
+                                onChange={toggleSelectAllIndustries}
+                                class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
                               />
-                              <span class="truncate max-w-[120px]">{ind}</span>
+                              <span>Select All ({filteredIndustries.length})</span>
                             </div>
-                            <span class="text-slate-400 font-mono">{industryCounts[ind]}</span>
                           </label>
-                        ))
+
+                          {(showAllIndustries ? filteredIndustries : filteredIndustries.slice(0, 5)).map(ind => (
+                            <label key={ind} class="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
+                              <div class="flex items-center gap-2">
+                                <input 
+                                  type="checkbox" 
+                                  checked={selectedIndustries.includes(ind)} 
+                                  onChange={() => toggleFilter(ind, selectedIndustries, setSelectedIndustries)}
+                                  class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
+                                />
+                                <span class="truncate max-w-[120px]">{ind}</span>
+                              </div>
+                              <span class="text-slate-400 font-mono">{formatCount(industryCounts[ind])}</span>
+                            </label>
+                          ))}
+                        </>
                       )}
+
                       {filteredIndustries.length > 5 && (
-                        <button onClick={() => setShowAllIndustries(!showAllIndustries)} class="text-xs text-blue-600 hover:underline pt-1 block">
+                        <button 
+                          onClick={() => setShowAllIndustries(!showAllIndustries)} 
+                          class="text-xs text-blue-600 hover:underline font-medium block pt-1"
+                        >
                           {showAllIndustries ? 'See Less' : 'See More'}
                         </button>
+                      )}
+
+                      {filteredIndustries.length > 0 && (
+                        <div class="pt-2">
+                          <input
+                            type="text"
+                            placeholder="Search industry"
+                            value={industrySearch}
+                            onChange={(e) => setIndustrySearch(e.target.value)}
+                            class="w-full px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Keywords / Tags Filter */}
+                <div class="pb-2">
+                  <div 
+                    onClick={() => toggleSection('tags')} 
+                    class="flex justify-between items-center cursor-pointer mb-2 text-slate-800 font-semibold text-sm"
+                  >
+                    <span>Keywords / Tags</span>
+                    <span class="text-xs text-slate-400">{openSections.tags ? '▲' : '▼'}</span>
+                  </div>
+
+                  {openSections.tags && (
+                    <div class="space-y-2 mt-2">
+                      {filteredTagsList.length === 0 ? (
+                        <p class="text-xs text-slate-400 italic">No tags available</p>
+                      ) : (
+                        <>
+                          <label class="flex items-center justify-between text-xs text-blue-600 font-semibold cursor-pointer hover:bg-blue-50 p-1 rounded border-b border-slate-100 mb-1">
+                            <div class="flex items-center gap-2">
+                              <input 
+                                type="checkbox" 
+                                checked={filteredTagsList.length > 0 && filteredTagsList.every(tag => selectedTags.includes(tag))} 
+                                onChange={toggleSelectAllTags}
+                                class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
+                              />
+                              <span>Select All ({filteredTagsList.length})</span>
+                            </div>
+                          </label>
+
+                          {(showAllTags ? filteredTagsList : filteredTagsList.slice(0, 5)).map(tag => (
+                            <label key={tag} class="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
+                              <div class="flex items-center gap-2">
+                                <input 
+                                  type="checkbox" 
+                                  checked={selectedTags.includes(tag)} 
+                                  onChange={() => toggleFilter(tag, selectedTags, setSelectedTags)}
+                                  class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
+                                />
+                                <span class="truncate max-w-[120px]">{tag}</span>
+                              </div>
+                              <span class="text-slate-400 font-mono">{formatCount(tagCounts[tag])}</span>
+                            </label>
+                          ))}
+                        </>
+                      )}
+
+                      {filteredTagsList.length > 5 && (
+                        <button 
+                          onClick={() => setShowAllTags(!showAllTags)} 
+                          class="text-xs text-blue-600 hover:underline font-medium block pt-1"
+                        >
+                          {showAllTags ? 'See Less' : 'See More'}
+                        </button>
+                      )}
+
+                      {filteredTagsList.length > 0 && (
+                        <div class="pt-2">
+                          <input
+                            type="text"
+                            placeholder="Search tags"
+                            value={tagSearch}
+                            onChange={(e) => setTagSearch(e.target.value)}
+                            class="w-full px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
                       )}
                     </div>
                   )}
@@ -386,53 +648,81 @@
               </div>
             </aside>
 
-            {/* Main Content */}
+            {/* Main Content Area */}
             <main class="flex-1 p-6 overflow-y-auto">
-              <div class="mb-4">
-                <h2 class="text-sm font-bold text-slate-700">
-                  {globalSearch.trim() !== "" ? `Search Results Across All Tabs` : activeTab} ({filteredSamples.length})
+              <div class="mb-4 flex items-center justify-between">
+                <h2 class="text-sm font-semibold text-slate-700">
+                  {globalSearch.trim() !== "" ? `Search Results across All Tabs` : activeTab} ({filteredSamples.length})
                 </h2>
               </div>
 
               {loading ? (
                 <div class="flex justify-center items-center py-24 text-slate-400 text-sm">
-                  Loading samples from sheet...
+                  Loading database records...
                 </div>
               ) : filteredSamples.length === 0 ? (
                 <div class="bg-white border border-slate-200 rounded-xl p-10 text-center text-slate-400 text-sm">
-                  No sample records found for this tab.
+                  No samples found matching selected query or filters.
                 </div>
               ) : (
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {filteredSamples.map(sample => (
-                    <div key={sample.id} class="bg-white rounded-xl border border-slate-200/90 p-4 shadow-xs hover:shadow-md transition flex flex-col justify-between">
+                    <div 
+                      key={sample.id} 
+                      class="bg-white rounded-xl border border-slate-200/90 p-4 shadow-sm hover:shadow-md transition relative flex flex-col justify-between"
+                    >
                       <div>
-                        <h3 class="text-sm font-bold text-slate-900 leading-snug mb-2">
-                          {sample.sampleName}
-                        </h3>
+                        {/* Title Header */}
+                        <div class="flex justify-between items-start mb-2">
+                          <h3 class="text-base font-bold text-slate-900 leading-tight">
+                            {sample.sampleName}
+                          </h3>
+                        </div>
 
+                        {/* Search Source Tab Label (visible when searching across all tabs) */}
                         {globalSearch.trim() !== "" && (
-                          <span class="inline-block bg-slate-100 text-slate-600 text-[10px] font-semibold px-2 py-0.5 rounded mb-2">
-                            📁 {sample.tabName}
-                          </span>
+                          <div class="mb-2">
+                            <span class="bg-slate-100 text-slate-600 text-[10px] font-semibold px-2 py-0.5 rounded">
+                              📁 {sample.tabName}
+                            </span>
+                          </div>
                         )}
 
-                        <div class="space-y-1 my-2 text-xs">
-                          {sample.sampleId && <p class="text-slate-600"><span class="font-semibold text-slate-700">ID:</span> {sample.sampleId}</p>}
-                          {sample.location && <p class="text-slate-600"><span class="font-semibold text-slate-700">Location:</span> {sample.location}</p>}
-                          {sample.industry && <p class="text-slate-600"><span class="font-semibold text-slate-700">Industry:</span> {sample.industry}</p>}
-                        </div>
+                        {/* Multi-column Detail Fields (Only show for standard multi-column tabs) */}
+                        {!sample.isSimpleTwoColumn && (
+                          <div class="space-y-1 my-3 text-xs">
+                            {sample.sampleId && <p class="text-slate-800"><span class="font-bold">Sample ID:</span> {sample.sampleId}</p>}
+                            
+                            {sample.location && (
+                              <p class="text-slate-800"><span class="font-bold">Location:</span> {sample.location}</p>
+                            )}
+                            
+                            {sample.industry && (
+                              <p class="text-slate-800"><span class="font-bold">Industry:</span> {sample.industry}</p>
+                            )}
+                            
+                            {sample.tags && (
+                              <div class="flex items-center gap-1.5 pt-1">
+                                <span class="font-bold text-slate-800">Keywords/Tags:</span>
+                                <span class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-[11px] font-medium truncate max-w-[150px]">
+                                  {sample.tags}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
 
-                      <div class="flex items-center justify-between pt-3 border-t border-slate-100 mt-2 text-xs">
-                        <span class="text-slate-400 font-medium">Sheet Link:</span>
+                      {/* Google Sheet Link */}
+                      <div class="flex items-center justify-between pt-3 border-t border-slate-100 mt-2">
+                        <span class="text-xs text-slate-500 font-medium">Sheet Link:</span>
                         <a 
                           href={sample.sampleSheet} 
                           target="_blank" 
                           rel="noopener noreferrer" 
-                          class="text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 hover:underline"
+                          class="text-blue-600 hover:text-blue-800 text-xs font-semibold flex items-center gap-1 hover:underline"
                         >
-                          ↗ Open Sheet
+                          <span>↗ Open Sheet</span>
                         </a>
                       </div>
                     </div>
