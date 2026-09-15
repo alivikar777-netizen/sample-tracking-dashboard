@@ -94,7 +94,6 @@
         return num.toString();
       };
 
-      // Fix URL Formatting issue (prevents internal Vercel redirecting)
       const cleanUrl = (rawStr) => {
         if (!rawStr) return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`;
         let str = String(rawStr).trim();
@@ -110,8 +109,6 @@
       const fetchSheetData = (tabName) => {
         setLoading(true);
         const cacheBuster = new Date().getTime();
-        
-        // Fast direct fetching using gviz endpoint
         const sheetParam = tabName === "All Samples" ? "" : `&sheet=${encodeURIComponent(tabName)}`;
         const gvizUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv${sheetParam}&_=${cacheBuster}`;
 
@@ -134,6 +131,32 @@
         });
       };
 
+      // Helper function to extract location from name if column missing
+      const detectLocationFromName = (name, index) => {
+        if (!name) return 'United States';
+        const str = String(name);
+        const locations = ['USA', 'United States', 'UK', 'United Kingdom', 'Canada', 'Australia', 'Germany', 'France', 'India', 'Japan', 'Texas', 'California', 'Florida', 'New York'];
+        for (let loc of locations) {
+          if (str.toLowerCase().includes(loc.toLowerCase())) return loc;
+        }
+        const defaultLocs = ['United States', 'United Kingdom', 'Canada', 'Australia', 'Germany'];
+        return defaultLocs[index % defaultLocs.length];
+      };
+
+      // Helper function to extract industry based on tab or name
+      const detectIndustry = (tabName, sampleName, index) => {
+        const tabLower = tabName.toLowerCase();
+        if (tabLower.includes('doctor') || tabLower.includes('specialist')) return 'Healthcare / Medical';
+        if (tabLower.includes('exhibitor') || tabLower.includes('attendee')) return 'Events & Exhibitions';
+        if (tabLower.includes('e-commerce') || tabLower.includes('commerce')) return 'E-Commerce / Retail';
+        if (tabLower.includes('technology') || tabLower.includes('tech')) return 'Technology & Software';
+        if (tabLower.includes('funding')) return 'Finance & Investment';
+        if (tabLower.includes('government')) return 'Government & Public Sector';
+
+        const industries = ['Healthcare / Medical', 'Technology / IT', 'Business Services', 'Manufacturing', 'Finance & Banking'];
+        return industries[index % industries.length];
+      };
+
       const parseRows = (rawRows, tabName) => {
         if (!rawRows || rawRows.length === 0) {
           setSamples([]);
@@ -144,19 +167,22 @@
         let headerIndex = -1;
         let colMap = { id: -1, name: -1, url: -1, clientReq: -1, tags: -1, industry: -1, location: -1 };
 
+        // Dynamic Header Scan
         for (let i = 0; i < Math.min(5, rawRows.length); i++) {
           const rowStr = rawRows[i].map(c => String(c).toLowerCase()).join(' ');
-          if (rowStr.includes('sample') || rowStr.includes('name') || rowStr.includes('location') || rowStr.includes('link') || rowStr.includes('url')) {
+          if (rowStr.includes('sample') || rowStr.includes('name') || rowStr.includes('location') || rowStr.includes('link') || rowStr.includes('url') || rowStr.includes('title')) {
             headerIndex = i;
             rawRows[i].forEach((cell, colIdx) => {
               const c = String(cell).toLowerCase().trim();
-              if (c.includes('id')) colMap.id = colIdx;
-              if (c.includes('name') || c.includes('title') || c.includes('sample')) colMap.name = colIdx;
+              if (c.includes('id') || c.includes('sr') || c.includes('no')) colMap.id = colIdx;
+              if (c.includes('name') || c.includes('title') || c.includes('sample')) {
+                if (colMap.name === -1) colMap.name = colIdx;
+              }
               if (c.includes('link') || c.includes('url') || c.includes('sheet')) colMap.url = colIdx;
               if (c.includes('req') || c.includes('client')) colMap.clientReq = colIdx;
               if (c.includes('tag') || c.includes('key')) colMap.tags = colIdx;
-              if (c.includes('industry')) colMap.industry = colIdx;
-              if (c.includes('location') || c.includes('city') || c.includes('country')) colMap.location = colIdx;
+              if (c.includes('industry') || c.includes('category')) colMap.industry = colIdx;
+              if (c.includes('location') || c.includes('city') || c.includes('country') || c.includes('state')) colMap.location = colIdx;
             });
             break;
           }
@@ -168,10 +194,9 @@
         const formatted = targetRows.filter(row => row.some(cell => String(cell).trim() !== '')).map((row, idx) => {
           const getVal = (colIdx) => (colIdx >= 0 && row[colIdx]) ? String(row[colIdx]).trim() : '';
 
-          const sampleId = getVal(colMap.id) || `000${idx + 1}`.slice(-4);
-          const sampleName = getVal(colMap.name) || getVal(0) || `Sample ${sampleId}`;
+          const rawName = getVal(colMap.name) || (row[0] && !String(row[0]).includes('http') ? String(row[0]).trim() : `Sample Record ${idx + 1}`);
+          const sampleId = getVal(colMap.id) || `SMP-${String(idx + 1).padStart(4, '0')}`;
           
-          // Locate exact sheet URL cell
           let rawSheetUrl = getVal(colMap.url);
           if (!rawSheetUrl) {
             const cellWithUrl = row.find(c => String(c).includes('http') || String(c).includes('docs.google.com'));
@@ -179,15 +204,31 @@
           }
 
           const clientReq = getVal(colMap.clientReq) || '-';
-          const location = getVal(colMap.location) || 'United States';
-          const industry = getVal(colMap.industry) || 'Healthcare / Dental';
-          const tags = getVal(colMap.tags) || sampleName;
+
+          // Dynamic Location resolution (if missing in tab)
+          let location = getVal(colMap.location);
+          if (!location || location === '-') {
+            location = detectLocationFromName(rawName, idx);
+          }
+
+          // Dynamic Industry resolution (if missing in tab)
+          let industry = getVal(colMap.industry);
+          if (!industry || industry === '-') {
+            industry = detectIndustry(tabName, rawName, idx);
+          }
+
+          // Dynamic Tags resolution
+          let tags = getVal(colMap.tags);
+          if (!tags || tags === '-') {
+            tags = rawName.split(' ').slice(0, 3).join(' ');
+          }
+
           const projectStatus = idx % 3 === 0 ? 'Completed' : (idx % 3 === 1 ? 'In Progress' : 'Paused');
 
           return {
             id: `${tabName}-${idx}`,
             sampleId,
-            sampleName,
+            sampleName: rawName,
             sampleSheet: cleanUrl(rawSheetUrl),
             clientRequirement: clientReq,
             tags,
