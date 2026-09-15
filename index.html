@@ -94,15 +94,21 @@
         return num.toString();
       };
 
+      // Strict URL extractor to prevent master sheet fallback when specific link is available
       const cleanUrl = (rawStr) => {
         if (!rawStr) return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`;
         let str = String(rawStr).trim();
-        const urlMatch = str.match(/https?:\/\/[^\s"']+/);
+        
+        // Extract HTTP/HTTPS links inside cells
+        const urlMatch = str.match(/https?:\/\/[^\s"']+/i);
         if (urlMatch) return urlMatch[0];
-        if (str.includes('docs.google.com') || str.includes('http')) {
+
+        // Match Google Docs links without http
+        if (str.includes('docs.google.com') || str.includes('spreadsheets')) {
           if (!str.startsWith('http')) return 'https://' + str;
           return str;
         }
+
         return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`;
       };
 
@@ -141,15 +147,15 @@
         let headerIndex = -1;
         let colMap = { id: -1, name: -1, url: -1, clientReq: -1, tags: -1, industry: -1, location: -1 };
 
-        // Dynamic Header Detection based ONLY on actual tab header text
-        for (let i = 0; i < Math.min(5, rawRows.length); i++) {
+        // Precise Header Detection across first 10 rows
+        for (let i = 0; i < Math.min(10, rawRows.length); i++) {
           const rowStr = rawRows[i].map(c => String(c).toLowerCase()).join(' ');
           if (rowStr.includes('sample') || rowStr.includes('name') || rowStr.includes('location') || rowStr.includes('link') || rowStr.includes('url') || rowStr.includes('title')) {
             headerIndex = i;
             rawRows[i].forEach((cell, colIdx) => {
               const c = String(cell).toLowerCase().trim();
               if (c.includes('id') || c.includes('sr') || c.includes('no')) colMap.id = colIdx;
-              if (c.includes('name') || c.includes('title') || c.includes('sample name') || c.includes('sample')) {
+              if (c.includes('name') || c.includes('title') || c.includes('sample name') || c === 'sample') {
                 if (colMap.name === -1) colMap.name = colIdx;
               }
               if (c.includes('link') || c.includes('url') || c.includes('sheet')) colMap.url = colIdx;
@@ -171,13 +177,16 @@
           const rawName = getVal(colMap.name) || (row[0] && !String(row[0]).includes('http') ? String(row[0]).trim() : `Sample Record ${idx + 1}`);
           const sampleId = getVal(colMap.id) || rawName;
           
+          // Search whole row for actual Google Sheet / Web Link if column map fails or yields plain text
           let rawSheetUrl = getVal(colMap.url);
-          if (!rawSheetUrl) {
-            const cellWithUrl = row.find(c => String(c).includes('http') || String(c).includes('docs.google.com'));
-            rawSheetUrl = cellWithUrl ? String(cellWithUrl) : '';
+          if (!rawSheetUrl || !rawSheetUrl.includes('http')) {
+            const foundUrlCell = row.find(c => String(c).includes('http') || String(c).includes('docs.google.com') || String(c).includes('spreadsheets'));
+            if (foundUrlCell) {
+              rawSheetUrl = String(foundUrlCell);
+            }
           }
 
-          // ONLY take data if the actual column exists in that sheet tab
+          // Strict column binding - no fake data generated
           const location = getVal(colMap.location);
           const industry = getVal(colMap.industry);
           const tags = getVal(colMap.tags);
@@ -200,7 +209,7 @@
         setLoading(false);
       };
 
-      // Sidebar Filter aggregations (only includes non-empty real data)
+      // Aggregations for Sidebar Filters
       const locationCounts = useMemo(() => {
         const counts = {};
         samples.forEach(s => {
@@ -243,6 +252,34 @@
           tag.toLowerCase().includes(tagSearch.toLowerCase())
         );
       }, [tagCounts, tagSearch]);
+
+      // Select All Toggle Handlers
+      const toggleSelectAllLocations = () => {
+        const allSelected = filteredLocations.every(loc => selectedLocations.includes(loc));
+        if (allSelected) {
+          setSelectedLocations(prev => prev.filter(loc => !filteredLocations.includes(loc)));
+        } else {
+          setSelectedLocations(prev => Array.from(new Set([...prev, ...filteredLocations])));
+        }
+      };
+
+      const toggleSelectAllIndustries = () => {
+        const allSelected = filteredIndustries.every(ind => selectedIndustries.includes(ind));
+        if (allSelected) {
+          setSelectedIndustries(prev => prev.filter(ind => !filteredIndustries.includes(ind)));
+        } else {
+          setSelectedIndustries(prev => Array.from(new Set([...prev, ...filteredIndustries])));
+        }
+      };
+
+      const toggleSelectAllTags = () => {
+        const allSelected = filteredTagsList.every(tag => selectedTags.includes(tag));
+        if (allSelected) {
+          setSelectedTags(prev => prev.filter(tag => !filteredTagsList.includes(tag)));
+        } else {
+          setSelectedTags(prev => Array.from(new Set([...prev, ...filteredTagsList])));
+        }
+      };
 
       // Main Filtered Data
       const filteredSamples = useMemo(() => {
@@ -347,20 +384,35 @@
                       {filteredLocations.length === 0 ? (
                         <p class="text-xs text-slate-400 italic">No locations in this tab</p>
                       ) : (
-                        (showAllLocations ? filteredLocations : filteredLocations.slice(0, 5)).map(loc => (
-                          <label key={loc} class="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
+                        <>
+                          {/* Select All Option */}
+                          <label class="flex items-center justify-between text-xs text-blue-600 font-semibold cursor-pointer hover:bg-blue-50 p-1 rounded border-b border-slate-100 mb-1">
                             <div class="flex items-center gap-2">
                               <input 
                                 type="checkbox" 
-                                checked={selectedLocations.includes(loc)} 
-                                onChange={() => toggleFilter(loc, selectedLocations, setSelectedLocations)}
+                                checked={filteredLocations.length > 0 && filteredLocations.every(loc => selectedLocations.includes(loc))} 
+                                onChange={toggleSelectAllLocations}
                                 class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
                               />
-                              <span class="truncate max-w-[120px]">{loc}</span>
+                              <span>Select All ({filteredLocations.length})</span>
                             </div>
-                            <span class="text-slate-400 font-mono">{formatCount(locationCounts[loc])}</span>
                           </label>
-                        ))
+
+                          {(showAllLocations ? filteredLocations : filteredLocations.slice(0, 5)).map(loc => (
+                            <label key={loc} class="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
+                              <div class="flex items-center gap-2">
+                                <input 
+                                  type="checkbox" 
+                                  checked={selectedLocations.includes(loc)} 
+                                  onChange={() => toggleFilter(loc, selectedLocations, setSelectedLocations)}
+                                  class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
+                                />
+                                <span class="truncate max-w-[120px]">{loc}</span>
+                              </div>
+                              <span class="text-slate-400 font-mono">{formatCount(locationCounts[loc])}</span>
+                            </label>
+                          ))}
+                        </>
                       )}
 
                       {filteredLocations.length > 5 && (
@@ -402,20 +454,35 @@
                       {filteredIndustries.length === 0 ? (
                         <p class="text-xs text-slate-400 italic">No industries in this tab</p>
                       ) : (
-                        (showAllIndustries ? filteredIndustries : filteredIndustries.slice(0, 5)).map(ind => (
-                          <label key={ind} class="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
+                        <>
+                          {/* Select All Option */}
+                          <label class="flex items-center justify-between text-xs text-blue-600 font-semibold cursor-pointer hover:bg-blue-50 p-1 rounded border-b border-slate-100 mb-1">
                             <div class="flex items-center gap-2">
                               <input 
                                 type="checkbox" 
-                                checked={selectedIndustries.includes(ind)} 
-                                onChange={() => toggleFilter(ind, selectedIndustries, setSelectedIndustries)}
+                                checked={filteredIndustries.length > 0 && filteredIndustries.every(ind => selectedIndustries.includes(ind))} 
+                                onChange={toggleSelectAllIndustries}
                                 class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
                               />
-                              <span class="truncate max-w-[120px]">{ind}</span>
+                              <span>Select All ({filteredIndustries.length})</span>
                             </div>
-                            <span class="text-slate-400 font-mono">{formatCount(industryCounts[ind])}</span>
                           </label>
-                        ))
+
+                          {(showAllIndustries ? filteredIndustries : filteredIndustries.slice(0, 5)).map(ind => (
+                            <label key={ind} class="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
+                              <div class="flex items-center gap-2">
+                                <input 
+                                  type="checkbox" 
+                                  checked={selectedIndustries.includes(ind)} 
+                                  onChange={() => toggleFilter(ind, selectedIndustries, setSelectedIndustries)}
+                                  class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
+                                />
+                                <span class="truncate max-w-[120px]">{ind}</span>
+                              </div>
+                              <span class="text-slate-400 font-mono">{formatCount(industryCounts[ind])}</span>
+                            </label>
+                          ))}
+                        </>
                       )}
 
                       {filteredIndustries.length > 5 && (
@@ -457,20 +524,35 @@
                       {filteredTagsList.length === 0 ? (
                         <p class="text-xs text-slate-400 italic">No tags in this tab</p>
                       ) : (
-                        (showAllTags ? filteredTagsList : filteredTagsList.slice(0, 5)).map(tag => (
-                          <label key={tag} class="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
+                        <>
+                          {/* Select All Option */}
+                          <label class="flex items-center justify-between text-xs text-blue-600 font-semibold cursor-pointer hover:bg-blue-50 p-1 rounded border-b border-slate-100 mb-1">
                             <div class="flex items-center gap-2">
                               <input 
                                 type="checkbox" 
-                                checked={selectedTags.includes(tag)} 
-                                onChange={() => toggleFilter(tag, selectedTags, setSelectedTags)}
+                                checked={filteredTagsList.length > 0 && filteredTagsList.every(tag => selectedTags.includes(tag))} 
+                                onChange={toggleSelectAllTags}
                                 class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
                               />
-                              <span class="truncate max-w-[120px]">{tag}</span>
+                              <span>Select All ({filteredTagsList.length})</span>
                             </div>
-                            <span class="text-slate-400 font-mono">{formatCount(tagCounts[tag])}</span>
                           </label>
-                        ))
+
+                          {(showAllTags ? filteredTagsList : filteredTagsList.slice(0, 5)).map(tag => (
+                            <label key={tag} class="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
+                              <div class="flex items-center gap-2">
+                                <input 
+                                  type="checkbox" 
+                                  checked={selectedTags.includes(tag)} 
+                                  onChange={() => toggleFilter(tag, selectedTags, setSelectedTags)}
+                                  class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
+                                />
+                                <span class="truncate max-w-[120px]">{tag}</span>
+                              </div>
+                              <span class="text-slate-400 font-mono">{formatCount(tagCounts[tag])}</span>
+                            </label>
+                          ))}
+                        </>
                       )}
 
                       {filteredTagsList.length > 5 && (
@@ -534,7 +616,7 @@
                           </span>
                         </div>
 
-                        {/* Clean Dynamic Detail Card Fields */}
+                        {/* Detail Card Fields */}
                         <div class="space-y-1 my-3 text-xs">
                           <p class="text-slate-800"><span class="font-bold">Sample ID:</span> {sample.sampleId}</p>
                           
