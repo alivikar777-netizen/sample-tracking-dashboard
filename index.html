@@ -53,7 +53,6 @@
       "E-Commerce Samples"
     ];
 
-    // Static Fallback Data for Doctors Tab in case GViz API fails
     const DOCTORS_FALLBACK_DATA = [
       { name: "General Surgeon Email List", url: "https://docs.google.com/spreadsheets/d/1Qy6Dr9ZRVX7jLOSA7RInVh9IR60azNm8SLghW8YpjF8/edit?gid=1564292089#gid=1564292089" },
       { name: "Anesthesiologist Email List", url: "https://docs.google.com/spreadsheets/d/1LeViVd3s7wrHD3DEA4ggEb0roThxbHjPAA8oz_CatFU/edit?gid=1564292089#gid=1564292089" },
@@ -96,12 +95,10 @@
       const [loading, setLoading] = useState(true);
       const [globalSearch, setGlobalSearch] = useState("");
 
-      // Filter selections
       const [selectedLocations, setSelectedLocations] = useState([]);
       const [selectedIndustries, setSelectedIndustries] = useState([]);
       const [selectedTags, setSelectedTags] = useState([]);
 
-      // Section open/close states
       const [openSections, setOpenSections] = useState({
         location: true,
         industry: true,
@@ -198,15 +195,14 @@
         return DOCTORS_FALLBACK_DATA.map((item, idx) => ({
           id: `Doctors - Specialist Email List-${idx}`,
           tabName: "Doctors - Specialist Email List",
-          sampleId: item.name,
+          sampleId: `DOC-${idx + 1}`,
           sampleName: item.name,
           sampleSheet: item.url,
-          clientRequirement: "",
-          tags: "",
-          industry: "",
-          location: "",
-          projectStatus: 'Completed',
-          isSimpleTwoColumn: true
+          clientRequirement: "Medical Specialist Email Records",
+          tags: "Healthcare, Doctors",
+          industry: "Healthcare / Medical",
+          location: "Global",
+          projectStatus: 'Completed'
         }));
       };
 
@@ -239,13 +235,11 @@
         const startIndex = headerIndex >= 0 ? headerIndex + 1 : 0;
         const targetRows = rawRows.slice(startIndex);
 
-        const isDoctorTab = tabName === "Doctors - Specialist Email List";
-
         return targetRows.filter(row => row.some(cell => String(cell).trim() !== '')).map((row, idx) => {
           const getVal = (colIdx) => (colIdx >= 0 && row[colIdx]) ? String(row[colIdx]).trim() : '';
 
           const rawName = getVal(colMap.name) || (row[0] && !String(row[0]).includes('http') ? String(row[0]).trim() : `Sample Record ${idx + 1}`);
-          const sampleId = getVal(colMap.id) || rawName;
+          const sampleId = getVal(colMap.id) || `SMP-${idx + 1}`;
           
           let rawSheetUrl = getVal(colMap.url);
           if (!rawSheetUrl || !rawSheetUrl.includes('http')) {
@@ -255,19 +249,17 @@
             }
           }
 
-          // Force simple 2-column mode for Doctors tab
           return {
             id: `${tabName}-${idx}`,
             tabName: tabName,
             sampleId,
             sampleName: rawName,
             sampleSheet: cleanUrl(rawSheetUrl),
-            clientRequirement: isDoctorTab ? "" : getVal(colMap.clientReq),
-            tags: isDoctorTab ? "" : getVal(colMap.tags),
-            industry: isDoctorTab ? "" : getVal(colMap.industry),
-            location: isDoctorTab ? "" : getVal(colMap.location),
-            projectStatus: 'Completed',
-            isSimpleTwoColumn: isDoctorTab
+            clientRequirement: getVal(colMap.clientReq) || "N/A",
+            tags: getVal(colMap.tags) || "General",
+            industry: getVal(colMap.industry) || "General",
+            location: getVal(colMap.location) || "Global",
+            projectStatus: 'Completed'
           };
         });
       };
@@ -279,7 +271,6 @@
         return allTabsData[activeTab] || [];
       }, [allTabsData, activeTab, globalSearch]);
 
-      // Aggregations for Sidebar Filters
       const locationCounts = useMemo(() => {
         const counts = {};
         currentScopeSamples.forEach(s => {
@@ -450,6 +441,18 @@
 
                   {openSections.location && (
                     <div class="space-y-2 mt-2">
+                      {filteredLocations.length > 0 && (
+                        <div class="pb-1">
+                          <input
+                            type="text"
+                            placeholder="Search location..."
+                            value={locationSearch}
+                            onChange={(e) => setLocationSearch(e.target.value)}
+                            class="w-full px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                      )}
+
                       {filteredLocations.length === 0 ? (
                         <p class="text-xs text-slate-400 italic">No locations available</p>
                       ) : (
@@ -491,18 +494,6 @@
                           {showAllLocations ? 'See Less' : 'See More'}
                         </button>
                       )}
-
-                      {filteredLocations.length > 0 && (
-                        <div class="pt-2">
-                          <input
-                            type="text"
-                            placeholder="Search location"
-                            value={locationSearch}
-                            onChange={(e) => setLocationSearch(e.target.value)}
-                            class="w-full px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-blue-500"
-                          />
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
@@ -519,6 +510,18 @@
 
                   {openSections.industry && (
                     <div class="space-y-2 mt-2">
+                      {filteredIndustries.length > 0 && (
+                        <div class="pb-1">
+                          <input
+                            type="text"
+                            placeholder="Search industry..."
+                            value={industrySearch}
+                            onChange={(e) => setIndustrySearch(e.target.value)}
+                            class="w-full px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                      )}
+
                       {filteredIndustries.length === 0 ? (
                         <p class="text-xs text-slate-400 italic">No industries available</p>
                       ) : (
@@ -560,18 +563,6 @@
                           {showAllIndustries ? 'See Less' : 'See More'}
                         </button>
                       )}
-
-                      {filteredIndustries.length > 0 && (
-                        <div class="pt-2">
-                          <input
-                            type="text"
-                            placeholder="Search industry"
-                            value={industrySearch}
-                            onChange={(e) => setIndustrySearch(e.target.value)}
-                            class="w-full px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-blue-500"
-                          />
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
@@ -588,6 +579,18 @@
 
                   {openSections.tags && (
                     <div class="space-y-2 mt-2">
+                      {filteredTagsList.length > 0 && (
+                        <div class="pb-1">
+                          <input
+                            type="text"
+                            placeholder="Search tags..."
+                            value={tagSearch}
+                            onChange={(e) => setTagSearch(e.target.value)}
+                            class="w-full px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                      )}
+
                       {filteredTagsList.length === 0 ? (
                         <p class="text-xs text-slate-400 italic">No tags available</p>
                       ) : (
@@ -629,18 +632,6 @@
                           {showAllTags ? 'See Less' : 'See More'}
                         </button>
                       )}
-
-                      {filteredTagsList.length > 0 && (
-                        <div class="pt-2">
-                          <input
-                            type="text"
-                            placeholder="Search tags"
-                            value={tagSearch}
-                            onChange={(e) => setTagSearch(e.target.value)}
-                            class="w-full px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-blue-500"
-                          />
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
@@ -650,83 +641,59 @@
 
             {/* Main Content Area */}
             <main class="flex-1 p-6 overflow-y-auto">
-              <div class="mb-4 flex items-center justify-between">
-                <h2 class="text-sm font-semibold text-slate-700">
-                  {globalSearch.trim() !== "" ? `Search Results across All Tabs` : activeTab} ({filteredSamples.length})
+              <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-bold text-slate-800">
+                  {globalSearch.trim() !== "" ? `Search Results across all tabs (${filteredSamples.length})` : `${activeTab} (${filteredSamples.length})`}
                 </h2>
               </div>
 
               {loading ? (
-                <div class="flex justify-center items-center py-24 text-slate-400 text-sm">
-                  Loading database records...
+                <div class="flex justify-center items-center h-64">
+                  <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 </div>
               ) : filteredSamples.length === 0 ? (
-                <div class="bg-white border border-slate-200 rounded-xl p-10 text-center text-slate-400 text-sm">
-                  No samples found matching selected query or filters.
+                <div class="bg-white rounded-lg border border-slate-200 p-8 text-center text-slate-500">
+                  No sample records found.
                 </div>
               ) : (
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {filteredSamples.map(sample => (
-                    <div 
-                      key={sample.id} 
-                      class="bg-white rounded-xl border border-slate-200/90 p-4 shadow-sm hover:shadow-md transition relative flex flex-col justify-between"
-                    >
-                      <div>
-                        {/* Title Header */}
-                        <div class="flex justify-between items-start mb-2">
-                          <h3 class="text-base font-bold text-slate-900 leading-tight">
-                            {sample.sampleName}
-                          </h3>
-                        </div>
-
-                        {/* Search Source Tab Label (visible when searching across all tabs) */}
-                        {globalSearch.trim() !== "" && (
-                          <div class="mb-2">
-                            <span class="bg-slate-100 text-slate-600 text-[10px] font-semibold px-2 py-0.5 rounded">
-                              📁 {sample.tabName}
-                            </span>
-                          </div>
-                        )}
-
-                        {/* Multi-column Detail Fields (Only show for standard multi-column tabs) */}
-                        {!sample.isSimpleTwoColumn && (
-                          <div class="space-y-1 my-3 text-xs">
-                            {sample.sampleId && <p class="text-slate-800"><span class="font-bold">Sample ID:</span> {sample.sampleId}</p>}
-                            
-                            {sample.location && (
-                              <p class="text-slate-800"><span class="font-bold">Location:</span> {sample.location}</p>
-                            )}
-                            
-                            {sample.industry && (
-                              <p class="text-slate-800"><span class="font-bold">Industry:</span> {sample.industry}</p>
-                            )}
-                            
-                            {sample.tags && (
-                              <div class="flex items-center gap-1.5 pt-1">
-                                <span class="font-bold text-slate-800">Keywords/Tags:</span>
-                                <span class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-[11px] font-medium truncate max-w-[150px]">
-                                  {sample.tags}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Google Sheet Link */}
-                      <div class="flex items-center justify-between pt-3 border-t border-slate-100 mt-2">
-                        <span class="text-xs text-slate-500 font-medium">Sheet Link:</span>
-                        <a 
-                          href={sample.sampleSheet} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          class="text-blue-600 hover:text-blue-800 text-xs font-semibold flex items-center gap-1 hover:underline"
-                        >
-                          <span>↗ Open Sheet</span>
-                        </a>
-                      </div>
-                    </div>
-                  ))}
+                <div class="bg-white rounded-lg border border-slate-200 shadow-xs overflow-hidden">
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
+                          <th class="py-3 px-4">Sample ID</th>
+                          <th class="py-3 px-4">Sample Name</th>
+                          <th class="py-3 px-4">Requirement</th>
+                          <th class="py-3 px-4">Industry</th>
+                          <th class="py-3 px-4">Location</th>
+                          <th class="py-3 px-4">Tags</th>
+                          <th class="py-3 px-4">Sample Link</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-slate-200">
+                        {filteredSamples.map((item) => (
+                          <tr key={item.id} class="hover:bg-slate-50/80 transition">
+                            <td class="py-3 px-4 font-mono text-slate-500">{item.sampleId}</td>
+                            <td class="py-3 px-4 font-medium text-slate-800">{item.sampleName}</td>
+                            <td class="py-3 px-4 text-slate-600 max-w-xs truncate">{item.clientRequirement}</td>
+                            <td class="py-3 px-4 text-slate-600">{item.industry}</td>
+                            <td class="py-3 px-4 text-slate-600">{item.location}</td>
+                            <td class="py-3 px-4 text-slate-600">{item.tags}</td>
+                            <td class="py-3 px-4">
+                              <a 
+                                href={item.sampleSheet} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                class="text-blue-600 hover:underline inline-flex items-center gap-1 font-medium"
+                              >
+                                View Sheet ↗
+                              </a>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </main>
@@ -735,7 +702,8 @@
       );
     }
 
-    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
   </script>
 </body>
 </html>
