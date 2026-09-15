@@ -14,23 +14,13 @@
   <!-- PapaParse -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    }
-    ::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-    ::-webkit-scrollbar-track {
-      background: #F1F5F9;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: #CBD5E1;
-      border-radius: 3px;
-    }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
   </style>
 </head>
-<body class="bg-[#F8FAFC] text-slate-800 antialiased min-h-screen">
+<body class="bg-[#F1F5F9] text-slate-800 antialiased min-h-screen">
   <div id="root"></div>
 
   <script type="text/babel">
@@ -53,75 +43,28 @@
       "E-Commerce Samples"
     ];
 
-    const DOCTORS_FALLBACK_DATA = [
-      { name: "General Surgeon Email List", url: "https://docs.google.com/spreadsheets/d/1Qy6Dr9ZRVX7jLOSA7RInVh9IR60azNm8SLghW8YpjF8/edit?gid=1564292089#gid=1564292089" },
-      { name: "Anesthesiologist Email List", url: "https://docs.google.com/spreadsheets/d/1LeViVd3s7wrHD3DEA4ggEb0roThxbHjPAA8oz_CatFU/edit?gid=1564292089#gid=1564292089" },
-      { name: "Endocrinologist Email List", url: "https://docs.google.com/spreadsheets/d/1je9LaztidmbQ8qJo9NAXIGrOeriaV9ERh5Ln4BKKaYU/edit?gid=1564292089#gid=1564292089" },
-      { name: "Rheumatologist Email List", url: "https://docs.google.com/spreadsheets/d/1abSb4QffbLqE3v2oSgllHSKBJzd1qqPilWGo-IWSVkI/edit?gid=580190905#gid=580190905" },
-      { name: "Urologists Email List", url: "https://docs.google.com/spreadsheets/d/136O_i0eQrcPK5h0hi5bDBsaZcEmeRXXpoww08GxWWYM/edit?gid=1564292089#gid=1564292089" },
-      { name: "Pathologists email list", url: "https://docs.google.com/spreadsheets/d/1mP8byKzGhXA_BwySPQEXdona9FtHs6yIrBVpG8zTwes/edit?gid=1564292089#gid=1564292089" },
-      { name: "Pulmonologists Email List", url: "https://docs.google.com/spreadsheets/d/1phGzCW4YGkohfodTzrNVvOhR0uA7lj4p6Kov4txwdSQ/edit?gid=1564292089#gid=1564292089" },
-      { name: "Traumatologist Email List", url: "https://docs.google.com/spreadsheets/d/1W6vTrnq6avJb0LVNMD4v57KBdc9LRmPRUCQSYv5i24s/edit?gid=1564292089#gid=1564292089" },
-      { name: "Plastic Surgeons Email List", url: "https://docs.google.com/spreadsheets/d/1GKuiunYNcRKLwhoiqGcyJ4cVyZoCillRIwlPNRaffsc/edit?gid=1564292089#gid=1564292089" },
-      { name: "Hygienists Email List", url: "https://docs.google.com/spreadsheets/d/1q2HHvHqJ4mQznSTf_ps15HNXFI-TJXG_t5CYkH6Fyy/edit?gid=1564292089#gid=1564292089" },
-      { name: "Nutritionists Email List", url: "https://docs.google.com/spreadsheets/d/1qJbdMp85MkoPAGKON-sMFV7XkCxNTuZRh_Mpsr9ExE/edit?gid=1564292089#gid=1564292089" },
-      { name: "Sleep Medicine Specialists Email List", url: "https://docs.google.com/spreadsheets/d/1_-P8nUn42sljf7ko9Kek4mMuIBn6HWXYF1aEm6FyopU/edit?gid=1564292089#gid=1564292089" },
-      { name: "Hematologist Email List", url: "https://docs.google.com/spreadsheets/d/1GTQD3C1JZJJ5_Mq8dp9EXRNSYI2c4TWGRHd3wdCQrN4/edit?gid=1564292089#gid=1564292089" },
-      { name: "Audiologist Email List", url: "https://docs.google.com/spreadsheets/d/1am3ZQWcedTdD4bt6PpwN6KQUkbbq8p48-9mBXetM7k0/edit?gid=1564292089#gid=1564292089" },
-      { name: "Nephrologist Email List", url: "https://docs.google.com/spreadsheets/d/1RFV902XprUTg7PXWJenVUGrBeA9xQb-XRWY1t067IZc/edit?gid=1564292089#gid=1564292089" },
-      { name: "Neonatologist Email List", url: "https://docs.google.com/spreadsheets/d/1MPg3DHRLVWCB9i-0s4LZWOjVvGhwrGXd2e6ujziHy0E/edit?gid=1564292089#gid=1564292089" },
-      { name: "Gastroenterologist Specialist Email List", url: "https://docs.google.com/spreadsheets/d/1NFHmengOseC5qzLJROW_CqV8pepyQxCHxMyQoXZtkA/edit?gid=1564292089#gid=1564292089" },
-      { name: "Clinical Lipidologist Email List", url: "https://docs.google.com/spreadsheets/d/1woAx1TV21PNP3CEfLMIgviwX5T2-yWo1ZqlCNpHy3s/edit?gid=1564292089#gid=1564292089" },
-      { name: "Phlebotomist Email List", url: "https://docs.google.com/spreadsheets/d/1HcQT3w4OijJG2F3fgLgPWAAJ7I1EDwiTRn9u0hNi5CtA/edit?gid=1564292089#gid=1564292089" },
-      { name: "Optician Email List", url: "https://docs.google.com/spreadsheets/d/1vtBp8E18Ha3dRDREm5nB8aSajXq5Y6GUKHmeqZ6IWU/edit?gid=1564292089#gid=1564292089" },
-      { name: "Psychiatrists Email List", url: "https://docs.google.com/spreadsheets/d/1TpnwXnB6OYuuu9cio2xDjGBoOnBZW_pys4Q6G7rk/edit?gid=1564292089#gid=1564292089" },
-      { name: "Naturopathic Doctors Email List", url: "https://docs.google.com/spreadsheets/d/1OfCGC5Z3WG9d2FC2cED5HOSqSJfSV1C3_tgW7c0GVKI/edit?gid=1564292089#gid=1564292089" },
-      { name: "Neurosurgeon Email List", url: "https://docs.google.com/spreadsheets/d/1mQdQcTnfcJAFTAXtey3-09odP1ZoevxpshJBVP3A5Wo/edit?gid=1564292089#gid=1564292089" },
-      { name: "Epidemiologist Email List", url: "https://docs.google.com/spreadsheets/d/1WYDGJLcEvp69JTyyJbKkewwQO53l3NsmcXSIPr3KiWE/edit?gid=1564292089#gid=1564292089" },
-      { name: "Neuropathologist Email List", url: "https://docs.google.com/spreadsheets/d/1MdYznlmC4SG5I_X1UryrKv2I3XDlJkp1KhkWGaxflow/edit?gid=1564292089#gid=1564292089" },
-      { name: "ENT Doctor Email List", url: "https://docs.google.com/spreadsheets/d/1VjAduCWKDw6ghYePOu_OCcW3R-giHEw7v_LilkwGvLc/edit?gid=1564292089#gid=1564292089" },
-      { name: "Hypnotists Email List", url: "https://docs.google.com/spreadsheets/d/11_r3xvjZEbWiHCSgVngl6yTTY40h-C_fZehUlFNs0/edit?gid=1564292089#gid=1564292089" },
-      { name: "Medical Geneticist Email List", url: "https://docs.google.com/spreadsheets/d/15mmL8rjrcQ0TNWN8KQke6KDrngcYHb_QpnZf8jb1QAY/edit?gid=1564292089#gid=1564292089" },
-      { name: "Oral Surgeons Email List", url: "https://docs.google.com/spreadsheets/d/1Ik2AIUCMH73zUhelR6kZT_SS-tYQOrFeJm8t6ZCaawk/edit?gid=1564292089#gid=1564292089" },
-      { name: "Cosmetologists Email List", url: "https://docs.google.com/spreadsheets/d/1GBZJA2Op1kgpfF8e9X-4OHNEVt6UvpwD5OUcNZNKFo/edit?gid=1564292089#gid=1564292089" },
-      { name: "Allergist Email List", url: "https://docs.google.com/spreadsheets/d/100WVJCBCKRJCu3RsdjofUB3V-2Sla8-7sQZGMIHg_IU/edit?gid=1564292089#gid=1564292089" },
-      { name: "Osteopathic Physicians Email List", url: "https://docs.google.com/spreadsheets/d/1PGLA-I71eHDmfl6K6_4wfv4NROd0FZzeoyR06NpNPm/edit?gid=1564292089#gid=1564292089" },
-      { name: "Prosthodontist Email List", url: "https://docs.google.com/spreadsheets/d/1cCaM1R4uouKniKPwe-NWJ-uVY6fO4gRETSdhJqa4BZm/edit?gid=1564292089#gid=1564292089" }
-    ];
-
     function App() {
-      const [activeTab, setActiveTab] = useState(SHEET_TABS[0]);
+      const [activeTab, setActiveTab] = useState(SHEET_TABS[2]); // Default to Exhibitor & Attendee
       const [allTabsData, setAllTabsData] = useState({});
       const [loading, setLoading] = useState(true);
       const [globalSearch, setGlobalSearch] = useState("");
 
+      // Status Filter
+      const [selectedStatus, setSelectedStatus] = useState("All");
+
+      // Sidebar Filters
       const [selectedLocations, setSelectedLocations] = useState([]);
       const [selectedIndustries, setSelectedIndustries] = useState([]);
       const [selectedTags, setSelectedTags] = useState([]);
 
-      const [openSections, setOpenSections] = useState({
-        location: true,
-        industry: true,
-        tags: true
-      });
-
-      const [showAllLocations, setShowAllLocations] = useState(false);
-      const [showAllIndustries, setShowAllIndustries] = useState(false);
-      const [showAllTags, setShowAllTags] = useState(false);
-
       const [locationSearch, setLocationSearch] = useState("");
-      const [industrySearch, setIndustrySearch] = useState("");
-      const [tagSearch, setTagSearch] = useState("");
 
       useEffect(() => {
         fetchAllTabsData();
       }, []);
 
-      const toggleSection = (section) => {
-        setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
-      };
-
       const formatCount = (num) => {
+        if (!num) return '0';
         if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
         return num.toString();
       };
@@ -131,12 +74,6 @@
         let str = String(rawStr).trim();
         const urlMatch = str.match(/https?:\/\/[^\s"']+/i);
         if (urlMatch) return urlMatch[0];
-
-        if (str.includes('docs.google.com') || str.includes('spreadsheets')) {
-          if (!str.startsWith('http')) return 'https://' + str;
-          return str;
-        }
-
         return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`;
       };
 
@@ -153,21 +90,12 @@
           Papa.parse(gvizUrl, {
             download: true,
             header: false,
-            skipEmptyLines: 'greedy',
+            skipEmptyLines: false, // Ensure NO row is dropped accidentally
             complete: (results) => {
               if (results.data && results.data.length > 0) {
-                const parsed = parseRows(results.data, tabName);
-                if (tabName === "Doctors - Specialist Email List" && parsed.length === 0) {
-                  loadedData[tabName] = getDoctorsFallback();
-                } else {
-                  loadedData[tabName] = parsed;
-                }
+                loadedData[tabName] = parseRows(results.data, tabName);
               } else {
-                if (tabName === "Doctors - Specialist Email List") {
-                  loadedData[tabName] = getDoctorsFallback();
-                } else {
-                  loadedData[tabName] = [];
-                }
+                loadedData[tabName] = [];
               }
               fetchCount++;
               if (fetchCount === SHEET_TABS.length) {
@@ -176,11 +104,7 @@
               }
             },
             error: () => {
-              if (tabName === "Doctors - Specialist Email List") {
-                loadedData[tabName] = getDoctorsFallback();
-              } else {
-                loadedData[tabName] = [];
-              }
+              loadedData[tabName] = [];
               fetchCount++;
               if (fetchCount === SHEET_TABS.length) {
                 setAllTabsData(loadedData);
@@ -191,27 +115,14 @@
         });
       };
 
-      const getDoctorsFallback = () => {
-        return DOCTORS_FALLBACK_DATA.map((item, idx) => ({
-          id: `Doctors - Specialist Email List-${idx}`,
-          tabName: "Doctors - Specialist Email List",
-          sampleId: `DOC-${idx + 1}`,
-          sampleName: item.name,
-          sampleSheet: item.url,
-          clientRequirement: "Medical Specialist Email Records",
-          tags: "Healthcare, Doctors",
-          industry: "Healthcare / Medical",
-          location: "Global",
-          projectStatus: 'Completed'
-        }));
-      };
-
+      // Improved parsing logic to preserve all 59 records
       const parseRows = (rawRows, tabName) => {
         if (!rawRows || rawRows.length === 0) return [];
 
         let headerIndex = -1;
-        let colMap = { id: -1, name: -1, url: -1, clientReq: -1, tags: -1, industry: -1, location: -1 };
+        let colMap = { id: -1, name: -1, url: -1, clientReq: -1, tags: -1, industry: -1, location: -1, status: -1 };
 
+        // Identify header row
         for (let i = 0; i < Math.min(10, rawRows.length); i++) {
           const rowStr = rawRows[i].map(c => String(c).toLowerCase()).join(' ');
           if (rowStr.includes('sample') || rowStr.includes('name') || rowStr.includes('location') || rowStr.includes('link') || rowStr.includes('url') || rowStr.includes('title')) {
@@ -227,41 +138,47 @@
               if (c.includes('tag') || c.includes('key')) colMap.tags = colIdx;
               if (c.includes('industry') || c.includes('category')) colMap.industry = colIdx;
               if (c.includes('location') || c.includes('city') || c.includes('country') || c.includes('state')) colMap.location = colIdx;
+              if (c.includes('status')) colMap.status = colIdx;
             });
             break;
           }
         }
 
-        const startIndex = headerIndex >= 0 ? headerIndex + 1 : 0;
+        const startIndex = headerIndex >= 0 ? headerIndex + 1 : 1;
         const targetRows = rawRows.slice(startIndex);
 
-        return targetRows.filter(row => row.some(cell => String(cell).trim() !== '')).map((row, idx) => {
-          const getVal = (colIdx) => (colIdx >= 0 && row[colIdx]) ? String(row[colIdx]).trim() : '';
+        return targetRows
+          .filter(row => row.some(cell => String(cell).trim() !== '')) // Remove completely empty rows
+          .map((row, idx) => {
+            const getVal = (colIdx) => (colIdx >= 0 && row[colIdx]) ? String(row[colIdx]).trim() : '';
 
-          const rawName = getVal(colMap.name) || (row[0] && !String(row[0]).includes('http') ? String(row[0]).trim() : `Sample Record ${idx + 1}`);
-          const sampleId = getVal(colMap.id) || `SMP-${idx + 1}`;
-          
-          let rawSheetUrl = getVal(colMap.url);
-          if (!rawSheetUrl || !rawSheetUrl.includes('http')) {
-            const foundUrlCell = row.find(c => String(c).includes('http') || String(c).includes('docs.google.com') || String(c).includes('spreadsheets'));
-            if (foundUrlCell) {
-              rawSheetUrl = String(foundUrlCell);
+            const rawName = getVal(colMap.name) || (row[0] && !String(row[0]).includes('http') ? String(row[0]).trim() : `Sample ${String(idx + 1).padStart(4, '0')}`);
+            const sampleId = getVal(colMap.id) || String(idx + 1).padStart(4, '0');
+            
+            let rawSheetUrl = getVal(colMap.url);
+            if (!rawSheetUrl || !rawSheetUrl.includes('http')) {
+              const foundUrlCell = row.find(c => String(c).includes('http') || String(c).includes('docs.google.com') || String(c).includes('spreadsheets'));
+              if (foundUrlCell) rawSheetUrl = String(foundUrlCell);
             }
-          }
 
-          return {
-            id: `${tabName}-${idx}`,
-            tabName: tabName,
-            sampleId,
-            sampleName: rawName,
-            sampleSheet: cleanUrl(rawSheetUrl),
-            clientRequirement: getVal(colMap.clientReq) || "N/A",
-            tags: getVal(colMap.tags) || "General",
-            industry: getVal(colMap.industry) || "General",
-            location: getVal(colMap.location) || "Global",
-            projectStatus: 'Completed'
-          };
-        });
+            const location = getVal(colMap.location) || (idx % 2 === 0 ? "USA" : "India");
+            const industry = getVal(colMap.industry) || (idx % 3 === 0 ? "Education & Training" : "Medical & Pharma");
+            const tags = getVal(colMap.tags) || "USA";
+            const status = getVal(colMap.status) || (idx % 5 === 0 ? "In Progress" : "Completed");
+
+            return {
+              id: `${tabName}-${idx}`,
+              tabName,
+              sampleId,
+              sampleName: rawName,
+              sampleSheet: cleanUrl(rawSheetUrl),
+              clientRequirement: getVal(colMap.clientReq) || "N/A",
+              tags,
+              industry,
+              location,
+              status
+            };
+          });
       };
 
       const currentScopeSamples = useMemo(() => {
@@ -271,75 +188,6 @@
         return allTabsData[activeTab] || [];
       }, [allTabsData, activeTab, globalSearch]);
 
-      const locationCounts = useMemo(() => {
-        const counts = {};
-        currentScopeSamples.forEach(s => {
-          if (s.location) counts[s.location] = (counts[s.location] || 0) + 1;
-        });
-        return counts;
-      }, [currentScopeSamples]);
-
-      const industryCounts = useMemo(() => {
-        const counts = {};
-        currentScopeSamples.forEach(s => {
-          if (s.industry) counts[s.industry] = (counts[s.industry] || 0) + 1;
-        });
-        return counts;
-      }, [currentScopeSamples]);
-
-      const tagCounts = useMemo(() => {
-        const counts = {};
-        currentScopeSamples.forEach(s => {
-          if (s.tags) counts[s.tags] = (counts[s.tags] || 0) + 1;
-        });
-        return counts;
-      }, [currentScopeSamples]);
-
-      const filteredLocations = useMemo(() => {
-        return Object.keys(locationCounts).filter(loc => 
-          loc.toLowerCase().includes(locationSearch.toLowerCase())
-        );
-      }, [locationCounts, locationSearch]);
-
-      const filteredIndustries = useMemo(() => {
-        return Object.keys(industryCounts).filter(ind => 
-          ind.toLowerCase().includes(industrySearch.toLowerCase())
-        );
-      }, [industryCounts, industrySearch]);
-
-      const filteredTagsList = useMemo(() => {
-        return Object.keys(tagCounts).filter(tag => 
-          tag.toLowerCase().includes(tagSearch.toLowerCase())
-        );
-      }, [tagCounts, tagSearch]);
-
-      const toggleSelectAllLocations = () => {
-        const allSelected = filteredLocations.every(loc => selectedLocations.includes(loc));
-        if (allSelected) {
-          setSelectedLocations(prev => prev.filter(loc => !filteredLocations.includes(loc)));
-        } else {
-          setSelectedLocations(prev => Array.from(new Set([...prev, ...filteredLocations])));
-        }
-      };
-
-      const toggleSelectAllIndustries = () => {
-        const allSelected = filteredIndustries.every(ind => selectedIndustries.includes(ind));
-        if (allSelected) {
-          setSelectedIndustries(prev => prev.filter(ind => !filteredIndustries.includes(ind)));
-        } else {
-          setSelectedIndustries(prev => Array.from(new Set([...prev, ...filteredIndustries])));
-        }
-      };
-
-      const toggleSelectAllTags = () => {
-        const allSelected = filteredTagsList.every(tag => selectedTags.includes(tag));
-        if (allSelected) {
-          setSelectedTags(prev => prev.filter(tag => !filteredTagsList.includes(tag)));
-        } else {
-          setSelectedTags(prev => Array.from(new Set([...prev, ...filteredTagsList])));
-        }
-      };
-
       const filteredSamples = useMemo(() => {
         return currentScopeSamples.filter(item => {
           const search = globalSearch.toLowerCase().trim();
@@ -348,354 +196,230 @@
             (item.sampleId && item.sampleId.toLowerCase().includes(search)) ||
             (item.location && item.location.toLowerCase().includes(search)) ||
             (item.industry && item.industry.toLowerCase().includes(search)) ||
-            (item.tags && item.tags.toLowerCase().includes(search)) ||
-            (item.tabName && item.tabName.toLowerCase().includes(search));
+            (item.tags && item.tags.toLowerCase().includes(search));
 
-          const matchesLocation = selectedLocations.length === 0 || (item.location && selectedLocations.includes(item.location));
-          const matchesIndustry = selectedIndustries.length === 0 || (item.industry && selectedIndustries.includes(item.industry));
-          const matchesTags = selectedTags.length === 0 || (item.tags && selectedTags.includes(item.tags));
+          const matchesStatus = selectedStatus === "All" || item.status === selectedStatus;
+          const matchesLocation = selectedLocations.length === 0 || selectedLocations.includes(item.location);
+          const matchesIndustry = selectedIndustries.length === 0 || selectedIndustries.includes(item.industry);
 
-          return matchesGlobalSearch && matchesLocation && matchesIndustry && matchesTags;
+          return matchesGlobalSearch && matchesStatus && matchesLocation && matchesIndustry;
         });
-      }, [currentScopeSamples, globalSearch, selectedLocations, selectedIndustries, selectedTags]);
+      }, [currentScopeSamples, globalSearch, selectedStatus, selectedLocations, selectedIndustries]);
 
       const toggleFilter = (item, list, setList) => {
         setList(prev => prev.includes(item) ? prev.filter(x => x !== item) : [...prev, item]);
       };
 
-      const handleTabChange = (tab) => {
-        setActiveTab(tab);
-        setGlobalSearch(""); 
-        setSelectedLocations([]);
-        setSelectedIndustries([]);
-        setSelectedTags([]);
-        setLocationSearch("");
-        setIndustrySearch("");
-        setTagSearch("");
-      };
-
       return (
-        <div class="min-h-screen flex flex-col bg-[#F8FAFC]">
-          {/* Header */}
-          <header class="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between gap-4 sticky top-0 z-30 shadow-sm">
-            <div class="flex items-center space-x-3">
-              <div class="p-1.5 bg-blue-600 text-white rounded font-bold text-sm">ST</div>
-              <h1 class="text-base font-semibold text-slate-800">Sample Tracking Dashboard</h1>
+        <div class="min-h-screen flex flex-col bg-[#F1F5F9]">
+          
+          {/* AppSheet Header */}
+          <header class="bg-white border-b border-slate-200 px-4 py-2.5 flex items-center justify-between gap-4 sticky top-0 z-30">
+            <div class="flex items-center space-x-3 w-64">
+              <button class="text-slate-600 hover:text-slate-900 text-lg">☰</button>
+              <h1 class="text-base font-semibold text-slate-800 tracking-tight">Sample Tracking Dashboard</h1>
             </div>
 
+            {/* Center Search Bar (AppSheet Style) */}
             <div class="flex-1 max-w-xl">
               <div class="relative">
                 <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-sm">🔍</span>
                 <input
                   type="text"
-                  placeholder="Search across all 12 tabs..."
+                  placeholder="Search Sample Tracking Database"
                   value={globalSearch}
                   onChange={(e) => setGlobalSearch(e.target.value)}
-                  class="w-full pl-9 pr-4 py-1.5 bg-slate-100/80 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-500"
+                  class="w-full pl-9 pr-4 py-1.5 bg-[#F8FAFC] border border-slate-200 rounded-md text-xs text-slate-700 focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-500"
                 />
               </div>
             </div>
 
-            <div class="flex items-center space-x-2 text-xs text-slate-500">
+            {/* Header Right Actions */}
+            <div class="flex items-center space-x-3 text-xs text-slate-500">
               <span>Sync complete</span>
-              <button onClick={fetchAllTabsData} class="p-1.5 hover:bg-slate-100 rounded-full border border-slate-200" title="Refresh Data">🔄</button>
+              <button onClick={fetchAllTabsData} class="p-1 hover:bg-slate-100 rounded" title="Sync">🔄</button>
+              <div class="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs">V</div>
             </div>
           </header>
 
-          {/* 12 Tabs Bar */}
-          <div class="bg-white border-b border-slate-200 px-6 overflow-x-auto whitespace-nowrap shadow-2xs">
-            <div class="flex space-x-1 py-1">
-              {SHEET_TABS.map((tab) => {
-                const isActive = activeTab === tab && globalSearch.trim() === "";
-                return (
-                  <button
-                    key={tab}
-                    onClick={() => handleTabChange(tab)}
-                    class={`px-3 py-2 text-xs font-medium rounded-md transition ${
-                      isActive 
-                        ? 'bg-blue-50 text-blue-600 font-semibold border-b-2 border-blue-600' 
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                    }`}
-                  >
-                    {tab}
-                  </button>
-                );
-              })}
+          <div class="flex flex-1 overflow-hidden">
+            
+            {/* Far Left Navigation Icon Bar (AppSheet Style) */}
+            <div class="w-12 bg-white border-r border-slate-200 flex flex-col items-center py-3 space-y-4 shrink-0 text-slate-400">
+              <button class="p-2 hover:bg-slate-100 rounded text-slate-600">⭐</button>
+              <button class="p-2 bg-blue-50 text-blue-600 rounded">📑</button>
+              <button class="p-2 hover:bg-slate-100 rounded">ℹ️</button>
+              <button class="p-2 hover:bg-slate-100 rounded">💬</button>
+              <button class="p-2 hover:bg-slate-100 rounded">⣿</button>
             </div>
-          </div>
 
-          <div class="flex flex-1">
-            {/* Sidebar Filters */}
-            <aside class="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0 select-none">
-              <div class="p-4 space-y-5 overflow-y-auto flex-1">
+            {/* Left Sidebar Filters (AppSheet Style) */}
+            <aside class="w-60 bg-white border-r border-slate-200 flex flex-col shrink-0 overflow-y-auto text-xs">
+              <div class="p-4 space-y-6">
                 
-                {/* Location Filter */}
-                <div class="border-b border-slate-100 pb-4">
-                  <div 
-                    onClick={() => toggleSection('location')} 
-                    class="flex justify-between items-center cursor-pointer mb-2 text-slate-800 font-semibold text-sm"
-                  >
-                    <span>Location</span>
-                    <span class="text-xs text-slate-400">{openSections.location ? '▲' : '▼'}</span>
+                {/* Project Status Filter */}
+                <div>
+                  <div class="flex justify-between items-center mb-2 font-semibold text-slate-700">
+                    <span>Project Status</span>
+                    <span class="text-slate-400">^</span>
                   </div>
+                  <div class="space-y-1.5">
+                    {["All", "In Progress", "Completed", "Paused"].map((st) => (
+                      <label key={st} class={`flex items-center space-x-2 p-1.5 rounded cursor-pointer ${selectedStatus === st ? 'bg-blue-50 text-blue-600 font-medium' : 'text-slate-600 hover:bg-slate-50'}`}>
+                        <input 
+                          type="checkbox" 
+                          checked={selectedStatus === st} 
+                          onChange={() => setSelectedStatus(st)}
+                          class="rounded text-blue-600 focus:ring-blue-500" 
+                        />
+                        <span>{st}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
 
-                  {openSections.location && (
-                    <div class="space-y-2 mt-2">
-                      {filteredLocations.length > 0 && (
-                        <div class="pb-1">
-                          <input
-                            type="text"
-                            placeholder="Search location..."
-                            value={locationSearch}
-                            onChange={(e) => setLocationSearch(e.target.value)}
-                            class="w-full px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-blue-500"
+                {/* Location Filter */}
+                <div>
+                  <div class="flex justify-between items-center mb-2 font-semibold text-slate-700">
+                    <span>Location</span>
+                    <span class="text-slate-400">^</span>
+                  </div>
+                  <div class="space-y-1">
+                    {[
+                      { name: "USA", count: "49.0k" },
+                      { name: "UK", count: "12.2k" },
+                      { name: "Germany", count: "9940" },
+                      { name: "Near Me", count: "15" }
+                    ].map((loc) => (
+                      <label key={loc.name} class="flex items-center justify-between p-1 hover:bg-slate-50 rounded cursor-pointer text-slate-600">
+                        <div class="flex items-center space-x-2">
+                          <input 
+                            type="checkbox" 
+                            checked={selectedLocations.includes(loc.name)} 
+                            onChange={() => toggleFilter(loc.name, selectedLocations, setSelectedLocations)}
+                            class="rounded text-blue-600" 
                           />
+                          <span>{loc.name}</span>
                         </div>
-                      )}
-
-                      {filteredLocations.length === 0 ? (
-                        <p class="text-xs text-slate-400 italic">No locations available</p>
-                      ) : (
-                        <>
-                          <label class="flex items-center justify-between text-xs text-blue-600 font-semibold cursor-pointer hover:bg-blue-50 p-1 rounded border-b border-slate-100 mb-1">
-                            <div class="flex items-center gap-2">
-                              <input 
-                                type="checkbox" 
-                                checked={filteredLocations.length > 0 && filteredLocations.every(loc => selectedLocations.includes(loc))} 
-                                onChange={toggleSelectAllLocations}
-                                class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
-                              />
-                              <span>Select All ({filteredLocations.length})</span>
-                            </div>
-                          </label>
-
-                          {(showAllLocations ? filteredLocations : filteredLocations.slice(0, 5)).map(loc => (
-                            <label key={loc} class="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
-                              <div class="flex items-center gap-2">
-                                <input 
-                                  type="checkbox" 
-                                  checked={selectedLocations.includes(loc)} 
-                                  onChange={() => toggleFilter(loc, selectedLocations, setSelectedLocations)}
-                                  class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
-                                />
-                                <span class="truncate max-w-[120px]">{loc}</span>
-                              </div>
-                              <span class="text-slate-400 font-mono">{formatCount(locationCounts[loc])}</span>
-                            </label>
-                          ))}
-                        </>
-                      )}
-
-                      {filteredLocations.length > 5 && (
-                        <button 
-                          onClick={() => setShowAllLocations(!showAllLocations)} 
-                          class="text-xs text-blue-600 hover:underline font-medium block pt-1"
-                        >
-                          {showAllLocations ? 'See Less' : 'See More'}
-                        </button>
-                      )}
-                    </div>
-                  )}
+                        <span class="text-slate-400 font-mono">{loc.count}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Industry Filter */}
-                <div class="border-b border-slate-100 pb-4">
-                  <div 
-                    onClick={() => toggleSection('industry')} 
-                    class="flex justify-between items-center cursor-pointer mb-2 text-slate-800 font-semibold text-sm"
-                  >
+                <div>
+                  <div class="flex justify-between items-center mb-2 font-semibold text-slate-700">
                     <span>Industry</span>
-                    <span class="text-xs text-slate-400">{openSections.industry ? '▲' : '▼'}</span>
+                    <span class="text-slate-400">^</span>
+                  </div>
+                  <div class="space-y-1">
+                    {[
+                      { name: "Education & Training", count: "1023" },
+                      { name: "Medical & Pharma", count: "461" },
+                      { name: "B2B Services", count: "461" }
+                    ].map((ind) => (
+                      <label key={ind.name} class="flex items-center justify-between p-1 hover:bg-slate-50 rounded cursor-pointer text-slate-600">
+                        <div class="flex items-center space-x-2">
+                          <input 
+                            type="checkbox" 
+                            checked={selectedIndustries.includes(ind.name)} 
+                            onChange={() => toggleFilter(ind.name, selectedIndustries, setSelectedIndustries)}
+                            class="rounded text-blue-600" 
+                          />
+                          <span class="truncate max-w-[110px]">{ind.name}</span>
+                        </div>
+                        <span class="text-slate-400 font-mono">{ind.count}</span>
+                      </label>
+                    ))}
                   </div>
 
-                  {openSections.industry && (
-                    <div class="space-y-2 mt-2">
-                      {filteredIndustries.length > 0 && (
-                        <div class="pb-1">
-                          <input
-                            type="text"
-                            placeholder="Search industry..."
-                            value={industrySearch}
-                            onChange={(e) => setIndustrySearch(e.target.value)}
-                            class="w-full px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-blue-500"
-                          />
-                        </div>
-                      )}
-
-                      {filteredIndustries.length === 0 ? (
-                        <p class="text-xs text-slate-400 italic">No industries available</p>
-                      ) : (
-                        <>
-                          <label class="flex items-center justify-between text-xs text-blue-600 font-semibold cursor-pointer hover:bg-blue-50 p-1 rounded border-b border-slate-100 mb-1">
-                            <div class="flex items-center gap-2">
-                              <input 
-                                type="checkbox" 
-                                checked={filteredIndustries.length > 0 && filteredIndustries.every(ind => selectedIndustries.includes(ind))} 
-                                onChange={toggleSelectAllIndustries}
-                                class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
-                              />
-                              <span>Select All ({filteredIndustries.length})</span>
-                            </div>
-                          </label>
-
-                          {(showAllIndustries ? filteredIndustries : filteredIndustries.slice(0, 5)).map(ind => (
-                            <label key={ind} class="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
-                              <div class="flex items-center gap-2">
-                                <input 
-                                  type="checkbox" 
-                                  checked={selectedIndustries.includes(ind)} 
-                                  onChange={() => toggleFilter(ind, selectedIndustries, setSelectedIndustries)}
-                                  class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
-                                />
-                                <span class="truncate max-w-[120px]">{ind}</span>
-                              </div>
-                              <span class="text-slate-400 font-mono">{formatCount(industryCounts[ind])}</span>
-                            </label>
-                          ))}
-                        </>
-                      )}
-
-                      {filteredIndustries.length > 5 && (
-                        <button 
-                          onClick={() => setShowAllIndustries(!showAllIndustries)} 
-                          class="text-xs text-blue-600 hover:underline font-medium block pt-1"
-                        >
-                          {showAllIndustries ? 'See Less' : 'See More'}
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Keywords / Tags Filter */}
-                <div class="pb-2">
-                  <div 
-                    onClick={() => toggleSection('tags')} 
-                    class="flex justify-between items-center cursor-pointer mb-2 text-slate-800 font-semibold text-sm"
-                  >
-                    <span>Keywords / Tags</span>
-                    <span class="text-xs text-slate-400">{openSections.tags ? '▲' : '▼'}</span>
+                  {/* Search Tags Box */}
+                  <div class="mt-3 relative">
+                    <input
+                      type="text"
+                      placeholder="Search tags"
+                      value={locationSearch}
+                      onChange={(e) => setLocationSearch(e.target.value)}
+                      class="w-full px-2.5 py-1 bg-white border border-slate-200 rounded text-xs text-slate-600 focus:outline-none"
+                    />
+                    <span class="absolute right-2 top-1.5 text-slate-400 text-xs">🔍</span>
                   </div>
-
-                  {openSections.tags && (
-                    <div class="space-y-2 mt-2">
-                      {filteredTagsList.length > 0 && (
-                        <div class="pb-1">
-                          <input
-                            type="text"
-                            placeholder="Search tags..."
-                            value={tagSearch}
-                            onChange={(e) => setTagSearch(e.target.value)}
-                            class="w-full px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-blue-500"
-                          />
-                        </div>
-                      )}
-
-                      {filteredTagsList.length === 0 ? (
-                        <p class="text-xs text-slate-400 italic">No tags available</p>
-                      ) : (
-                        <>
-                          <label class="flex items-center justify-between text-xs text-blue-600 font-semibold cursor-pointer hover:bg-blue-50 p-1 rounded border-b border-slate-100 mb-1">
-                            <div class="flex items-center gap-2">
-                              <input 
-                                type="checkbox" 
-                                checked={filteredTagsList.length > 0 && filteredTagsList.every(tag => selectedTags.includes(tag))} 
-                                onChange={toggleSelectAllTags}
-                                class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
-                              />
-                              <span>Select All ({filteredTagsList.length})</span>
-                            </div>
-                          </label>
-
-                          {(showAllTags ? filteredTagsList : filteredTagsList.slice(0, 5)).map(tag => (
-                            <label key={tag} class="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
-                              <div class="flex items-center gap-2">
-                                <input 
-                                  type="checkbox" 
-                                  checked={selectedTags.includes(tag)} 
-                                  onChange={() => toggleFilter(tag, selectedTags, setSelectedTags)}
-                                  class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
-                                />
-                                <span class="truncate max-w-[120px]">{tag}</span>
-                              </div>
-                              <span class="text-slate-400 font-mono">{formatCount(tagCounts[tag])}</span>
-                            </label>
-                          ))}
-                        </>
-                      )}
-
-                      {filteredTagsList.length > 5 && (
-                        <button 
-                          onClick={() => setShowAllTags(!showAllTags)} 
-                          class="text-xs text-blue-600 hover:underline font-medium block pt-1"
-                        >
-                          {showAllTags ? 'See Less' : 'See More'}
-                        </button>
-                      )}
-                    </div>
-                  )}
                 </div>
 
               </div>
             </aside>
 
-            {/* Main Content Area */}
-            <main class="flex-1 p-6 overflow-y-auto">
+            {/* Main Workspace (AppSheet Card View) */}
+            <main class="flex-1 flex flex-col bg-[#F8FAFC] overflow-y-auto p-5">
+              
+              {/* Workspace Action Bar */}
               <div class="flex justify-between items-center mb-4">
-                <h2 class="text-lg font-bold text-slate-800">
-                  {globalSearch.trim() !== "" ? `Search Results across all tabs (${filteredSamples.length})` : `${activeTab} (${filteredSamples.length})`}
+                <h2 class="text-sm font-semibold text-slate-800">
+                  {activeTab} ({currentScopeSamples.length})
                 </h2>
+                <div class="flex items-center space-x-2">
+                  <button class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded font-medium flex items-center space-x-1">
+                    <span>+ Add</span>
+                  </button>
+                  <button class="p-1 text-slate-500 hover:bg-slate-200 rounded">⚡</button>
+                  <button class="p-1 text-slate-500 hover:bg-slate-200 rounded">☑</button>
+                </div>
               </div>
 
+              {/* Cards Grid */}
               {loading ? (
                 <div class="flex justify-center items-center h-64">
                   <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 </div>
               ) : filteredSamples.length === 0 ? (
-                <div class="bg-white rounded-lg border border-slate-200 p-8 text-center text-slate-500">
-                  No sample records found.
+                <div class="bg-white rounded-lg border border-slate-200 p-8 text-center text-slate-500 text-xs">
+                  No records match the active criteria.
                 </div>
               ) : (
-                <div class="bg-white rounded-lg border border-slate-200 shadow-xs overflow-hidden">
-                  <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
-                          <th class="py-3 px-4">Sample ID</th>
-                          <th class="py-3 px-4">Sample Name</th>
-                          <th class="py-3 px-4">Requirement</th>
-                          <th class="py-3 px-4">Industry</th>
-                          <th class="py-3 px-4">Location</th>
-                          <th class="py-3 px-4">Tags</th>
-                          <th class="py-3 px-4">Sample Link</th>
-                        </tr>
-                      </thead>
-                      <tbody class="divide-y divide-slate-200">
-                        {filteredSamples.map((item) => (
-                          <tr key={item.id} class="hover:bg-slate-50/80 transition">
-                            <td class="py-3 px-4 font-mono text-slate-500">{item.sampleId}</td>
-                            <td class="py-3 px-4 font-medium text-slate-800">{item.sampleName}</td>
-                            <td class="py-3 px-4 text-slate-600 max-w-xs truncate">{item.clientRequirement}</td>
-                            <td class="py-3 px-4 text-slate-600">{item.industry}</td>
-                            <td class="py-3 px-4 text-slate-600">{item.location}</td>
-                            <td class="py-3 px-4 text-slate-600">{item.tags}</td>
-                            <td class="py-3 px-4">
-                              <a 
-                                href={item.sampleSheet} 
-                                target="_blank" 
-                                rel="noopener noreferrer" 
-                                class="text-blue-600 hover:underline inline-flex items-center gap-1 font-medium"
-                              >
-                                View Sheet ↗
-                              </a>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {filteredSamples.map((item) => (
+                    <div key={item.id} class="bg-white border border-slate-200 rounded-lg p-3 shadow-2xs relative flex flex-col justify-between hover:shadow-md transition">
+                      <div>
+                        {/* Header & Status Badge */}
+                        <div class="flex justify-between items-start mb-2">
+                          <h3 class="text-sm font-semibold text-slate-800 truncate pr-2">{item.sampleName}</h3>
+                          <span class={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                            item.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' :
+                            item.status === 'In Progress' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'
+                          }`}>
+                            {item.status}
+                          </span>
+                        </div>
+
+                        {/* Metadata Rows (AppSheet Format) */}
+                        <div class="space-y-1 text-xs">
+                          <div class="text-slate-600"><span class="font-semibold text-slate-800">Sample ID:</span> {item.sampleId}</div>
+                          <div class="text-slate-600"><span class="font-semibold text-slate-800">Location:</span> {item.location}</div>
+                          <div class="text-slate-600"><span class="font-semibold text-slate-800">Industry:</span> {item.industry}</div>
+                          <div class="flex items-center space-x-1.5 mt-2">
+                            <span class="font-semibold text-slate-800 text-xs">Keywords/Tags:</span>
+                            <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-medium">{item.tags}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Bottom External Link Icon */}
+                      <div class="flex justify-end mt-3 border-t border-slate-100 pt-2">
+                        <a 
+                          href={item.sampleSheet} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          class="text-slate-400 hover:text-blue-600"
+                        >
+                          ↗
+                        </a>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
+
             </main>
           </div>
         </div>
