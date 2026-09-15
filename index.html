@@ -102,8 +102,11 @@
 
       const fetchSheetData = (tabName) => {
         setLoading(true);
+        const cacheBuster = new Date().getTime();
+        
+        // Fetch specific tab data using encoded sheet parameter & fallback query
         const encodedTab = encodeURIComponent(tabName);
-        const gvizUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodedTab}`;
+        const gvizUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodedTab}&_=${cacheBuster}`;
         const corsProxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(gvizUrl)}`;
 
         Papa.parse(corsProxyUrl, {
@@ -170,13 +173,30 @@
         }
 
         const startIndex = headerIndex >= 0 ? headerIndex + 1 : 0;
+        
+        // Filter rows by tab name if "All Samples" isn't active
+        let targetRows = rawRows.slice(startIndex);
+        if (tabName !== "All Samples") {
+          const filteredByTab = targetRows.filter(row => {
+            const rowStr = row.map(c => String(c)).join(' ');
+            return rowStr.toLowerCase().includes(tabName.toLowerCase());
+          });
+          if (filteredByTab.length > 0) {
+            targetRows = filteredByTab;
+          }
+        }
 
-        const formatted = rawRows.slice(startIndex).filter(row => row.some(cell => String(cell).trim() !== '')).map((row, idx) => {
+        const formatted = targetRows.filter(row => row.some(cell => String(cell).trim() !== '')).map((row, idx) => {
           const getVal = (colIdx) => row[colIdx] ? String(row[colIdx]).trim() : '';
 
           const sampleId = getVal(colMap.id) || `000${idx + 1}`.slice(-4);
           const sampleName = getVal(colMap.name) || getVal(0) || `Sample ${sampleId}`;
-          const rawSheetUrl = getVal(colMap.url) || row.find(c => String(c).includes('http')) || '';
+          
+          let rawSheetUrl = getVal(colMap.url) || row.find(c => String(c).includes('http')) || '';
+          if (!rawSheetUrl) {
+            rawSheetUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit#gid=0`;
+          }
+          
           const clientReq = getVal(colMap.clientReq) || '-';
 
           let location = getVal(colMap.location);
@@ -185,18 +205,18 @@
             if (words.length > 1 && words[words.length - 1] === words[words.length - 1].toUpperCase()) {
               location = words[words.length - 1];
             } else {
-              location = idx % 3 === 0 ? 'USA' : (idx % 3 === 1 ? 'UK' : 'Germany');
+              location = 'United States';
             }
           }
 
           let industry = getVal(colMap.industry);
           if (!industry || industry === '-') {
-            industry = idx % 2 === 0 ? 'Education & Training' : 'Medical & Pharma';
+            industry = 'Healthcare / Dental';
           }
 
           let tags = getVal(colMap.tags);
           if (!tags || tags === '-') {
-            tags = location;
+            tags = sampleName;
           }
 
           const projectStatus = idx % 3 === 0 ? 'Completed' : (idx % 3 === 1 ? 'In Progress' : 'Paused');
@@ -324,7 +344,7 @@
           </header>
 
           {/* 12 Tabs Bar */}
-          <div class="bg-white border-b border-slate-200 px-6 overflow-x-auto whitespace-nowrap shadow-2xs scrollbar-none">
+          <div class="bg-white border-b border-slate-200 px-6 overflow-x-auto whitespace-nowrap shadow-2xs">
             <div class="flex space-x-1 py-1">
               {SHEET_TABS.map((tab) => {
                 const isActive = activeTab === tab;
@@ -334,7 +354,7 @@
                     onClick={() => handleTabChange(tab)}
                     class={`px-3 py-2 text-xs font-medium rounded-md transition ${
                       isActive 
-                        ? 'bg-blue-50 text-blue-600 font-semibold' 
+                        ? 'bg-blue-50 text-blue-600 font-semibold border-b-2 border-blue-600' 
                         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                     }`}
                   >
@@ -526,7 +546,7 @@
                       <div>
                         {/* Status Badge */}
                         <div class="flex justify-between items-start mb-1">
-                          <h3 class="text-lg font-bold text-slate-900 leading-tight">
+                          <h3 class="text-base font-bold text-slate-900 leading-tight">
                             {sample.sampleName}
                           </h3>
                           <span class={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
@@ -545,28 +565,24 @@
                           
                           <div class="flex items-center gap-1.5 pt-1">
                             <span class="font-bold text-slate-800">Keywords/Tags:</span>
-                            <span class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-[11px] font-medium">
+                            <span class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-[11px] font-medium truncate max-w-[150px]">
                               {sample.tags}
                             </span>
                           </div>
                         </div>
                       </div>
 
-                      {/* Google Sheet Direct Link */}
-                      <div class="flex justify-end pt-2 border-t border-slate-100">
-                        {sample.sampleSheet ? (
-                          <a 
-                            href={sample.sampleSheet} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            class="text-slate-600 hover:text-blue-600 text-base font-bold p-1 rounded transition"
-                            title="Open Google Sheet"
-                          >
-                            ↗
-                          </a>
-                        ) : (
-                          <span class="text-slate-300 text-base font-bold">↗</span>
-                        )}
+                      {/* Google Sheet Direct Link Section */}
+                      <div class="flex items-center justify-between pt-3 border-t border-slate-100 mt-2">
+                        <span class="text-xs text-slate-500 font-medium">Google Sheet Link:</span>
+                        <a 
+                          href={sample.sampleSheet} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          class="text-blue-600 hover:text-blue-800 text-xs font-semibold flex items-center gap-1 hover:underline"
+                        >
+                          <span>↗ Open Sheet</span>
+                        </a>
                       </div>
                     </div>
                   ))}
