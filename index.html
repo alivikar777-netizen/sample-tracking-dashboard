@@ -4,30 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sample Tracking Dashboard</title>
-  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- React & ReactDOM -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <!-- Babel -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <!-- PapaParse -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    }
-    ::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-    ::-webkit-scrollbar-track {
-      background: #F1F5F9;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: #CBD5E1;
-      border-radius: 3px;
-    }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #F1F5F9; }
+    ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
   </style>
 </head>
 <body class="bg-[#F8FAFC] text-slate-800 antialiased min-h-screen">
@@ -89,6 +75,39 @@
       { name: "Prosthodontist Email List", url: "https://docs.google.com/spreadsheets/d/1cCaM1R4uouKniKPwe-NWJ-uVY6fO4gRETSdhJqa4BZm/edit?gid=1564292089#gid=1564292089" }
     ];
 
+    /* ---------- Badge colour helpers (screenshot style) ---------- */
+
+    const STATUS_STYLES = {
+      "completed":   "bg-emerald-50 text-emerald-700 border-emerald-200",
+      "in progress": "bg-amber-50 text-amber-700 border-amber-200",
+      "pending":     "bg-rose-50 text-rose-700 border-rose-200",
+      "on hold":     "bg-slate-100 text-slate-600 border-slate-200"
+    };
+    const statusStyle = (s) =>
+      STATUS_STYLES[String(s || "").toLowerCase().trim()] || STATUS_STYLES["on hold"];
+
+    const TAG_PALETTE = [
+      "bg-blue-50 text-blue-700 border-blue-200",
+      "bg-purple-50 text-purple-700 border-purple-200",
+      "bg-pink-50 text-pink-700 border-pink-200",
+      "bg-teal-50 text-teal-700 border-teal-200",
+      "bg-orange-50 text-orange-700 border-orange-200",
+      "bg-indigo-50 text-indigo-700 border-indigo-200",
+      "bg-lime-50 text-lime-700 border-lime-200"
+    ];
+    const tagStyle = (tag) => {
+      let h = 0;
+      const t = String(tag);
+      for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) >>> 0;
+      return TAG_PALETTE[h % TAG_PALETTE.length];
+    };
+
+    const splitTags = (raw) =>
+      String(raw || "")
+        .split(/[,/|;]+/)
+        .map(t => t.trim())
+        .filter(Boolean);
+
     function App() {
       const [activeTab, setActiveTab] = useState(SHEET_TABS[0]);
       const [allTabsData, setAllTabsData] = useState({});
@@ -99,12 +118,7 @@
       const [selectedIndustries, setSelectedIndustries] = useState([]);
       const [selectedTags, setSelectedTags] = useState([]);
 
-      const [openSections, setOpenSections] = useState({
-        location: true,
-        industry: true,
-        tags: true
-      });
-
+      const [openSections, setOpenSections] = useState({ location: true, industry: true, tags: true });
       const [showAllLocations, setShowAllLocations] = useState(false);
       const [showAllIndustries, setShowAllIndustries] = useState(false);
       const [showAllTags, setShowAllTags] = useState(false);
@@ -113,30 +127,21 @@
       const [industrySearch, setIndustrySearch] = useState("");
       const [tagSearch, setTagSearch] = useState("");
 
-      useEffect(() => {
-        fetchAllTabsData();
-      }, []);
+      useEffect(() => { fetchAllTabsData(); }, []);
 
-      const toggleSection = (section) => {
+      const toggleSection = (section) =>
         setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
-      };
 
-      const formatCount = (num) => {
-        if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
-        return num.toString();
-      };
+      const formatCount = (num) => (num >= 1000 ? (num / 1000).toFixed(1) + 'k' : String(num));
 
       const cleanUrl = (rawStr) => {
         if (!rawStr) return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`;
         let str = String(rawStr).trim();
         const urlMatch = str.match(/https?:\/\/[^\s"']+/i);
         if (urlMatch) return urlMatch[0];
-
         if (str.includes('docs.google.com') || str.includes('spreadsheets')) {
-          if (!str.startsWith('http')) return 'https://' + str;
-          return str;
+          return str.startsWith('http') ? str : 'https://' + str;
         }
-
         return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`;
       };
 
@@ -150,49 +155,37 @@
           const sheetParam = `&sheet=${encodeURIComponent(tabName)}`;
           const gvizUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv${sheetParam}&_=${cacheBuster}`;
 
+          const done = () => {
+            fetchCount++;
+            if (fetchCount === SHEET_TABS.length) {
+              setAllTabsData(loadedData);
+              setLoading(false);
+            }
+          };
+
           Papa.parse(gvizUrl, {
             download: true,
             header: false,
             skipEmptyLines: 'greedy',
             complete: (results) => {
-              if (results.data && results.data.length > 0) {
-                const parsed = parseRows(results.data, tabName);
-                if (tabName === "Doctors - Specialist Email List" && parsed.length === 0) {
-                  loadedData[tabName] = getDoctorsFallback();
-                } else {
-                  loadedData[tabName] = parsed;
-                }
-              } else {
-                if (tabName === "Doctors - Specialist Email List") {
-                  loadedData[tabName] = getDoctorsFallback();
-                } else {
-                  loadedData[tabName] = [];
-                }
-              }
-              fetchCount++;
-              if (fetchCount === SHEET_TABS.length) {
-                setAllTabsData(loadedData);
-                setLoading(false);
-              }
-            },
-            error: () => {
-              if (tabName === "Doctors - Specialist Email List") {
+              const parsed = (results.data && results.data.length > 0) ? parseRows(results.data, tabName) : [];
+              if (tabName === "Doctors - Specialist Email List" && parsed.length === 0) {
                 loadedData[tabName] = getDoctorsFallback();
               } else {
-                loadedData[tabName] = [];
+                loadedData[tabName] = parsed;
               }
-              fetchCount++;
-              if (fetchCount === SHEET_TABS.length) {
-                setAllTabsData(loadedData);
-                setLoading(false);
-              }
+              done();
+            },
+            error: () => {
+              loadedData[tabName] = tabName === "Doctors - Specialist Email List" ? getDoctorsFallback() : [];
+              done();
             }
           });
         });
       };
 
-      const getDoctorsFallback = () => {
-        return DOCTORS_FALLBACK_DATA.map((item, idx) => ({
+      const getDoctorsFallback = () =>
+        DOCTORS_FALLBACK_DATA.map((item, idx) => ({
           id: `Doctors - Specialist Email List-${idx}`,
           tabName: "Doctors - Specialist Email List",
           sampleId: `DOC-${idx + 1}`,
@@ -204,13 +197,12 @@
           location: "Global",
           projectStatus: 'Completed'
         }));
-      };
 
       const parseRows = (rawRows, tabName) => {
         if (!rawRows || rawRows.length === 0) return [];
 
         let headerIndex = -1;
-        let colMap = { id: -1, name: -1, url: -1, clientReq: -1, tags: -1, industry: -1, location: -1 };
+        let colMap = { id: -1, name: -1, url: -1, clientReq: -1, tags: -1, industry: -1, location: -1, status: -1 };
 
         for (let i = 0; i < Math.min(10, rawRows.length); i++) {
           const rowStr = rawRows[i].map(c => String(c).toLowerCase()).join(' ');
@@ -219,7 +211,7 @@
             rawRows[i].forEach((cell, colIdx) => {
               const c = String(cell).toLowerCase().trim();
               if (c.includes('id') || c.includes('sr') || c.includes('no')) colMap.id = colIdx;
-              if (c.includes('name') || c.includes('title') || c.includes('sample name') || c === 'samples' || c === 'sample') {
+              if (c.includes('name') || c.includes('title') || c === 'samples' || c === 'sample') {
                 if (colMap.name === -1) colMap.name = colIdx;
               }
               if (c.includes('link') || c.includes('url') || c.includes('sheet')) colMap.url = colIdx;
@@ -227,6 +219,7 @@
               if (c.includes('tag') || c.includes('key')) colMap.tags = colIdx;
               if (c.includes('industry') || c.includes('category')) colMap.industry = colIdx;
               if (c.includes('location') || c.includes('city') || c.includes('country') || c.includes('state')) colMap.location = colIdx;
+              if (c.includes('status') || c.includes('stage')) colMap.status = colIdx;
             });
             break;
           }
@@ -240,18 +233,16 @@
 
           const rawName = getVal(colMap.name) || (row[0] && !String(row[0]).includes('http') ? String(row[0]).trim() : `Sample Record ${idx + 1}`);
           const sampleId = getVal(colMap.id) || `SMP-${idx + 1}`;
-          
+
           let rawSheetUrl = getVal(colMap.url);
           if (!rawSheetUrl || !rawSheetUrl.includes('http')) {
             const foundUrlCell = row.find(c => String(c).includes('http') || String(c).includes('docs.google.com') || String(c).includes('spreadsheets'));
-            if (foundUrlCell) {
-              rawSheetUrl = String(foundUrlCell);
-            }
+            if (foundUrlCell) rawSheetUrl = String(foundUrlCell);
           }
 
           return {
             id: `${tabName}-${idx}`,
-            tabName: tabName,
+            tabName,
             sampleId,
             sampleName: rawName,
             sampleSheet: cleanUrl(rawSheetUrl),
@@ -259,91 +250,57 @@
             tags: getVal(colMap.tags) || "General",
             industry: getVal(colMap.industry) || "General",
             location: getVal(colMap.location) || "Global",
-            projectStatus: 'Completed'
+            projectStatus: getVal(colMap.status) || 'Completed'
           };
         });
       };
 
       const currentScopeSamples = useMemo(() => {
-        if (globalSearch.trim() !== "") {
-          return Object.values(allTabsData).flat();
-        }
+        if (globalSearch.trim() !== "") return Object.values(allTabsData).flat();
         return allTabsData[activeTab] || [];
       }, [allTabsData, activeTab, globalSearch]);
 
-      const locationCounts = useMemo(() => {
+      const countBy = (key) => {
         const counts = {};
         currentScopeSamples.forEach(s => {
-          if (s.location) counts[s.location] = (counts[s.location] || 0) + 1;
+          if (s[key]) counts[s[key]] = (counts[s[key]] || 0) + 1;
         });
         return counts;
-      }, [currentScopeSamples]);
+      };
 
-      const industryCounts = useMemo(() => {
-        const counts = {};
-        currentScopeSamples.forEach(s => {
-          if (s.industry) counts[s.industry] = (counts[s.industry] || 0) + 1;
-        });
-        return counts;
-      }, [currentScopeSamples]);
-
+      const locationCounts = useMemo(() => countBy('location'), [currentScopeSamples]);
+      const industryCounts = useMemo(() => countBy('industry'), [currentScopeSamples]);
       const tagCounts = useMemo(() => {
         const counts = {};
         currentScopeSamples.forEach(s => {
-          if (s.tags) counts[s.tags] = (counts[s.tags] || 0) + 1;
+          splitTags(s.tags).forEach(t => { counts[t] = (counts[t] || 0) + 1; });
         });
         return counts;
       }, [currentScopeSamples]);
 
-      const filteredLocations = useMemo(() => {
-        return Object.keys(locationCounts).filter(loc => 
-          loc.toLowerCase().includes(locationSearch.toLowerCase())
-        );
-      }, [locationCounts, locationSearch]);
+      const filteredLocations = useMemo(
+        () => Object.keys(locationCounts).filter(l => l.toLowerCase().includes(locationSearch.toLowerCase())),
+        [locationCounts, locationSearch]
+      );
+      const filteredIndustries = useMemo(
+        () => Object.keys(industryCounts).filter(i => i.toLowerCase().includes(industrySearch.toLowerCase())),
+        [industryCounts, industrySearch]
+      );
+      const filteredTagsList = useMemo(
+        () => Object.keys(tagCounts).filter(t => t.toLowerCase().includes(tagSearch.toLowerCase())),
+        [tagCounts, tagSearch]
+      );
 
-      const filteredIndustries = useMemo(() => {
-        return Object.keys(industryCounts).filter(ind => 
-          ind.toLowerCase().includes(industrySearch.toLowerCase())
-        );
-      }, [industryCounts, industrySearch]);
-
-      const filteredTagsList = useMemo(() => {
-        return Object.keys(tagCounts).filter(tag => 
-          tag.toLowerCase().includes(tagSearch.toLowerCase())
-        );
-      }, [tagCounts, tagSearch]);
-
-      const toggleSelectAllLocations = () => {
-        const allSelected = filteredLocations.every(loc => selectedLocations.includes(loc));
-        if (allSelected) {
-          setSelectedLocations(prev => prev.filter(loc => !filteredLocations.includes(loc)));
-        } else {
-          setSelectedLocations(prev => Array.from(new Set([...prev, ...filteredLocations])));
-        }
-      };
-
-      const toggleSelectAllIndustries = () => {
-        const allSelected = filteredIndustries.every(ind => selectedIndustries.includes(ind));
-        if (allSelected) {
-          setSelectedIndustries(prev => prev.filter(ind => !filteredIndustries.includes(ind)));
-        } else {
-          setSelectedIndustries(prev => Array.from(new Set([...prev, ...filteredIndustries])));
-        }
-      };
-
-      const toggleSelectAllTags = () => {
-        const allSelected = filteredTagsList.every(tag => selectedTags.includes(tag));
-        if (allSelected) {
-          setSelectedTags(prev => prev.filter(tag => !filteredTagsList.includes(tag)));
-        } else {
-          setSelectedTags(prev => Array.from(new Set([...prev, ...filteredTagsList])));
-        }
+      const makeToggleAll = (filteredList, selected, setSelected) => () => {
+        const allSelected = filteredList.length > 0 && filteredList.every(x => selected.includes(x));
+        if (allSelected) setSelected(prev => prev.filter(x => !filteredList.includes(x)));
+        else setSelected(prev => Array.from(new Set([...prev, ...filteredList])));
       };
 
       const filteredSamples = useMemo(() => {
         return currentScopeSamples.filter(item => {
           const search = globalSearch.toLowerCase().trim();
-          const matchesGlobalSearch = search === "" || 
+          const matchesGlobalSearch = search === "" ||
             (item.sampleName && item.sampleName.toLowerCase().includes(search)) ||
             (item.sampleId && item.sampleId.toLowerCase().includes(search)) ||
             (item.location && item.location.toLowerCase().includes(search)) ||
@@ -353,70 +310,172 @@
 
           const matchesLocation = selectedLocations.length === 0 || (item.location && selectedLocations.includes(item.location));
           const matchesIndustry = selectedIndustries.length === 0 || (item.industry && selectedIndustries.includes(item.industry));
-          const matchesTags = selectedTags.length === 0 || (item.tags && selectedTags.includes(item.tags));
+          const itemTags = splitTags(item.tags);
+          const matchesTags = selectedTags.length === 0 || itemTags.some(t => selectedTags.includes(t));
 
           return matchesGlobalSearch && matchesLocation && matchesIndustry && matchesTags;
         });
       }, [currentScopeSamples, globalSearch, selectedLocations, selectedIndustries, selectedTags]);
 
-      const toggleFilter = (item, list, setList) => {
+      const toggleFilter = (item, list, setList) =>
         setList(prev => prev.includes(item) ? prev.filter(x => x !== item) : [...prev, item]);
-      };
 
       const handleTabChange = (tab) => {
         setActiveTab(tab);
-        setGlobalSearch(""); 
-        setSelectedLocations([]);
-        setSelectedIndustries([]);
-        setSelectedTags([]);
-        setLocationSearch("");
-        setIndustrySearch("");
-        setTagSearch("");
+        setGlobalSearch("");
+        setSelectedLocations([]); setSelectedIndustries([]); setSelectedTags([]);
+        setLocationSearch(""); setIndustrySearch(""); setTagSearch("");
+      };
+
+      const clearAllFilters = () => {
+        setSelectedLocations([]); setSelectedIndustries([]); setSelectedTags([]);
+      };
+
+      const activeFilterCount = selectedLocations.length + selectedIndustries.length + selectedTags.length;
+
+      /* ---------- Reusable filter block ---------- */
+      const FilterBlock = ({ label, sectionKey, list, counts, selected, setSelected,
+                            search, setSearch, showAll, setShowAll, last }) => (
+        <div className={last ? "pb-2" : "border-b border-slate-100 pb-4"}>
+          <div onClick={() => toggleSection(sectionKey)}
+               className="flex justify-between items-center cursor-pointer mb-2 text-slate-800 font-semibold text-sm">
+            <span>{label}</span>
+            <span className="text-xs text-slate-400">{openSections[sectionKey] ? '▲' : '▼'}</span>
+          </div>
+
+          {openSections[sectionKey] && (
+            <div className="space-y-1.5 mt-2">
+              {Object.keys(counts).length > 0 && (
+                <input
+                  type="text"
+                  placeholder={`Search ${label.toLowerCase()}...`}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-blue-500 mb-1"
+                />
+              )}
+
+              {list.length === 0 ? (
+                <p className="text-xs text-slate-400 italic">No {label.toLowerCase()} available</p>
+              ) : (
+                <>
+                  <label className="flex items-center justify-between text-xs text-blue-600 font-semibold cursor-pointer hover:bg-blue-50 p-1 rounded border-b border-slate-100 mb-1">
+                    <div className="flex items-center gap-2">
+                      <input type="checkbox"
+                        checked={list.length > 0 && list.every(x => selected.includes(x))}
+                        onChange={makeToggleAll(list, selected, setSelected)}
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                      <span>Select All ({list.length})</span>
+                    </div>
+                  </label>
+
+                  {(showAll ? list : list.slice(0, 5)).map(x => (
+                    <label key={x} className="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <input type="checkbox"
+                          checked={selected.includes(x)}
+                          onChange={() => toggleFilter(x, selected, setSelected)}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0" />
+                        <span className="truncate max-w-[120px]" title={x}>{x}</span>
+                      </div>
+                      <span className="text-slate-400 font-mono shrink-0 ml-1">{formatCount(counts[x])}</span>
+                    </label>
+                  ))}
+                </>
+              )}
+
+              {list.length > 5 && (
+                <button onClick={() => setShowAll(!showAll)}
+                  className="text-xs text-blue-600 hover:underline font-medium block pt-1">
+                  {showAll ? 'See Less' : 'See More'}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      );
+
+      /* ---------- Sample card (screenshot layout) ---------- */
+      const SampleCard = ({ item }) => {
+        const tags = splitTags(item.tags);
+        return (
+          <div className="bg-white rounded-lg border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 transition p-4 flex flex-col">
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <h3 className="text-sm font-semibold text-slate-800 leading-snug line-clamp-2" title={item.sampleName}>
+                {item.sampleName}
+              </h3>
+              <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${statusStyle(item.projectStatus)}`}>
+                {item.projectStatus}
+              </span>
+            </div>
+
+            <div className="space-y-1 text-[11px] text-slate-600 flex-1">
+              <p><span className="text-slate-400">Sample ID:</span> <span className="font-mono text-slate-700">{item.sampleId}</span></p>
+              <p className="truncate"><span className="text-slate-400">Location:</span> {item.location}</p>
+              <p className="truncate"><span className="text-slate-400">Industry:</span> {item.industry}</p>
+              {item.clientRequirement && item.clientRequirement !== "N/A" && (
+                <p className="truncate" title={item.clientRequirement}>
+                  <span className="text-slate-400">Requirement:</span> {item.clientRequirement}
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-end justify-between gap-2 mt-3 pt-2 border-t border-slate-100">
+              <div className="flex flex-wrap items-center gap-1 min-w-0">
+                <span className="text-[10px] text-slate-400 mr-0.5">Keywords/Tags:</span>
+                {tags.slice(0, 3).map((t, i) => (
+                  <span key={i} className={`text-[10px] px-1.5 py-0.5 rounded border ${tagStyle(t)}`}>{t}</span>
+                ))}
+                {tags.length > 3 && <span className="text-[10px] text-slate-400">+{tags.length - 3}</span>}
+              </div>
+              <a href={item.sampleSheet} target="_blank" rel="noopener noreferrer"
+                 title="Open sample sheet"
+                 className="shrink-0 w-6 h-6 grid place-items-center rounded border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-400 hover:bg-blue-50 transition">
+                ↗
+              </a>
+            </div>
+          </div>
+        );
       };
 
       return (
-        <div class="min-h-screen flex flex-col bg-[#F8FAFC]">
+        <div className="min-h-screen flex flex-col bg-[#F8FAFC]">
           {/* Header */}
-          <header class="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between gap-4 sticky top-0 z-30 shadow-sm">
-            <div class="flex items-center space-x-3">
-              <div class="p-1.5 bg-blue-600 text-white rounded font-bold text-sm">ST</div>
-              <h1 class="text-base font-semibold text-slate-800">Sample Tracking Dashboard</h1>
+          <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between gap-4 sticky top-0 z-30 shadow-sm">
+            <div className="flex items-center space-x-3">
+              <div className="p-1.5 bg-blue-600 text-white rounded font-bold text-sm">ST</div>
+              <h1 className="text-base font-semibold text-slate-800">Sample Tracking Dashboard</h1>
             </div>
 
-            <div class="flex-1 max-w-xl">
-              <div class="relative">
-                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-sm">🔍</span>
+            <div className="flex-1 max-w-xl">
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-sm">🔍</span>
                 <input
                   type="text"
                   placeholder="Search across all 12 tabs..."
                   value={globalSearch}
                   onChange={(e) => setGlobalSearch(e.target.value)}
-                  class="w-full pl-9 pr-4 py-1.5 bg-slate-100/80 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-500"
+                  className="w-full pl-9 pr-4 py-1.5 bg-slate-100/80 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-500"
                 />
               </div>
             </div>
 
-            <div class="flex items-center space-x-2 text-xs text-slate-500">
-              <span>Sync complete</span>
-              <button onClick={fetchAllTabsData} class="p-1.5 hover:bg-slate-100 rounded-full border border-slate-200" title="Refresh Data">🔄</button>
+            <div className="flex items-center space-x-2 text-xs text-slate-500">
+              <span>{loading ? 'Syncing…' : 'Sync complete'}</span>
+              <button onClick={fetchAllTabsData} className="p-1.5 hover:bg-slate-100 rounded-full border border-slate-200" title="Refresh Data">🔄</button>
             </div>
           </header>
 
-          {/* 12 Tabs Bar */}
-          <div class="bg-white border-b border-slate-200 px-6 overflow-x-auto whitespace-nowrap shadow-2xs">
-            <div class="flex space-x-1 py-1">
+          {/* Tabs */}
+          <div className="bg-white border-b border-slate-200 px-6 overflow-x-auto whitespace-nowrap">
+            <div className="flex space-x-1 py-1">
               {SHEET_TABS.map((tab) => {
                 const isActive = activeTab === tab && globalSearch.trim() === "";
                 return (
-                  <button
-                    key={tab}
-                    onClick={() => handleTabChange(tab)}
-                    class={`px-3 py-2 text-xs font-medium rounded-md transition ${
-                      isActive 
-                        ? 'bg-blue-50 text-blue-600 font-semibold border-b-2 border-blue-600' 
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                    }`}
-                  >
+                  <button key={tab} onClick={() => handleTabChange(tab)}
+                    className={`px-3 py-2 text-xs font-medium rounded-md transition ${
+                      isActive ? 'bg-blue-50 text-blue-600 font-semibold border-b-2 border-blue-600'
+                               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}`}>
                     {tab}
                   </button>
                 );
@@ -424,276 +483,57 @@
             </div>
           </div>
 
-          <div class="flex flex-1">
-            {/* Sidebar Filters */}
-            <aside class="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0 select-none">
-              <div class="p-4 space-y-5 overflow-y-auto flex-1">
-                
-                {/* Location Filter */}
-                <div class="border-b border-slate-100 pb-4">
-                  <div 
-                    onClick={() => toggleSection('location')} 
-                    class="flex justify-between items-center cursor-pointer mb-2 text-slate-800 font-semibold text-sm"
-                  >
-                    <span>Location</span>
-                    <span class="text-xs text-slate-400">{openSections.location ? '▲' : '▼'}</span>
-                  </div>
+          <div className="flex flex-1">
+            {/* Sidebar */}
+            <aside className="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0 select-none">
+              <div className="p-4 space-y-5 overflow-y-auto flex-1">
+                <FilterBlock label="Location" sectionKey="location"
+                  list={filteredLocations} counts={locationCounts}
+                  selected={selectedLocations} setSelected={setSelectedLocations}
+                  search={locationSearch} setSearch={setLocationSearch}
+                  showAll={showAllLocations} setShowAll={setShowAllLocations} />
 
-                  {openSections.location && (
-                    <div class="space-y-2 mt-2">
-                      {filteredLocations.length > 0 && (
-                        <div class="pb-1">
-                          <input
-                            type="text"
-                            placeholder="Search location..."
-                            value={locationSearch}
-                            onChange={(e) => setLocationSearch(e.target.value)}
-                            class="w-full px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-blue-500"
-                          />
-                        </div>
-                      )}
+                <FilterBlock label="Industry" sectionKey="industry"
+                  list={filteredIndustries} counts={industryCounts}
+                  selected={selectedIndustries} setSelected={setSelectedIndustries}
+                  search={industrySearch} setSearch={setIndustrySearch}
+                  showAll={showAllIndustries} setShowAll={setShowAllIndustries} />
 
-                      {filteredLocations.length === 0 ? (
-                        <p class="text-xs text-slate-400 italic">No locations available</p>
-                      ) : (
-                        <>
-                          <label class="flex items-center justify-between text-xs text-blue-600 font-semibold cursor-pointer hover:bg-blue-50 p-1 rounded border-b border-slate-100 mb-1">
-                            <div class="flex items-center gap-2">
-                              <input 
-                                type="checkbox" 
-                                checked={filteredLocations.length > 0 && filteredLocations.every(loc => selectedLocations.includes(loc))} 
-                                onChange={toggleSelectAllLocations}
-                                class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
-                              />
-                              <span>Select All ({filteredLocations.length})</span>
-                            </div>
-                          </label>
-
-                          {(showAllLocations ? filteredLocations : filteredLocations.slice(0, 5)).map(loc => (
-                            <label key={loc} class="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
-                              <div class="flex items-center gap-2">
-                                <input 
-                                  type="checkbox" 
-                                  checked={selectedLocations.includes(loc)} 
-                                  onChange={() => toggleFilter(loc, selectedLocations, setSelectedLocations)}
-                                  class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
-                                />
-                                <span class="truncate max-w-[120px]">{loc}</span>
-                              </div>
-                              <span class="text-slate-400 font-mono">{formatCount(locationCounts[loc])}</span>
-                            </label>
-                          ))}
-                        </>
-                      )}
-
-                      {filteredLocations.length > 5 && (
-                        <button 
-                          onClick={() => setShowAllLocations(!showAllLocations)} 
-                          class="text-xs text-blue-600 hover:underline font-medium block pt-1"
-                        >
-                          {showAllLocations ? 'See Less' : 'See More'}
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Industry Filter */}
-                <div class="border-b border-slate-100 pb-4">
-                  <div 
-                    onClick={() => toggleSection('industry')} 
-                    class="flex justify-between items-center cursor-pointer mb-2 text-slate-800 font-semibold text-sm"
-                  >
-                    <span>Industry</span>
-                    <span class="text-xs text-slate-400">{openSections.industry ? '▲' : '▼'}</span>
-                  </div>
-
-                  {openSections.industry && (
-                    <div class="space-y-2 mt-2">
-                      {filteredIndustries.length > 0 && (
-                        <div class="pb-1">
-                          <input
-                            type="text"
-                            placeholder="Search industry..."
-                            value={industrySearch}
-                            onChange={(e) => setIndustrySearch(e.target.value)}
-                            class="w-full px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-blue-500"
-                          />
-                        </div>
-                      )}
-
-                      {filteredIndustries.length === 0 ? (
-                        <p class="text-xs text-slate-400 italic">No industries available</p>
-                      ) : (
-                        <>
-                          <label class="flex items-center justify-between text-xs text-blue-600 font-semibold cursor-pointer hover:bg-blue-50 p-1 rounded border-b border-slate-100 mb-1">
-                            <div class="flex items-center gap-2">
-                              <input 
-                                type="checkbox" 
-                                checked={filteredIndustries.length > 0 && filteredIndustries.every(ind => selectedIndustries.includes(ind))} 
-                                onChange={toggleSelectAllIndustries}
-                                class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
-                              />
-                              <span>Select All ({filteredIndustries.length})</span>
-                            </div>
-                          </label>
-
-                          {(showAllIndustries ? filteredIndustries : filteredIndustries.slice(0, 5)).map(ind => (
-                            <label key={ind} class="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
-                              <div class="flex items-center gap-2">
-                                <input 
-                                  type="checkbox" 
-                                  checked={selectedIndustries.includes(ind)} 
-                                  onChange={() => toggleFilter(ind, selectedIndustries, setSelectedIndustries)}
-                                  class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
-                                />
-                                <span class="truncate max-w-[120px]">{ind}</span>
-                              </div>
-                              <span class="text-slate-400 font-mono">{formatCount(industryCounts[ind])}</span>
-                            </label>
-                          ))}
-                        </>
-                      )}
-
-                      {filteredIndustries.length > 5 && (
-                        <button 
-                          onClick={() => setShowAllIndustries(!showAllIndustries)} 
-                          class="text-xs text-blue-600 hover:underline font-medium block pt-1"
-                        >
-                          {showAllIndustries ? 'See Less' : 'See More'}
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Keywords / Tags Filter */}
-                <div class="pb-2">
-                  <div 
-                    onClick={() => toggleSection('tags')} 
-                    class="flex justify-between items-center cursor-pointer mb-2 text-slate-800 font-semibold text-sm"
-                  >
-                    <span>Keywords / Tags</span>
-                    <span class="text-xs text-slate-400">{openSections.tags ? '▲' : '▼'}</span>
-                  </div>
-
-                  {openSections.tags && (
-                    <div class="space-y-2 mt-2">
-                      {filteredTagsList.length > 0 && (
-                        <div class="pb-1">
-                          <input
-                            type="text"
-                            placeholder="Search tags..."
-                            value={tagSearch}
-                            onChange={(e) => setTagSearch(e.target.value)}
-                            class="w-full px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-blue-500"
-                          />
-                        </div>
-                      )}
-
-                      {filteredTagsList.length === 0 ? (
-                        <p class="text-xs text-slate-400 italic">No tags available</p>
-                      ) : (
-                        <>
-                          <label class="flex items-center justify-between text-xs text-blue-600 font-semibold cursor-pointer hover:bg-blue-50 p-1 rounded border-b border-slate-100 mb-1">
-                            <div class="flex items-center gap-2">
-                              <input 
-                                type="checkbox" 
-                                checked={filteredTagsList.length > 0 && filteredTagsList.every(tag => selectedTags.includes(tag))} 
-                                onChange={toggleSelectAllTags}
-                                class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
-                              />
-                              <span>Select All ({filteredTagsList.length})</span>
-                            </div>
-                          </label>
-
-                          {(showAllTags ? filteredTagsList : filteredTagsList.slice(0, 5)).map(tag => (
-                            <label key={tag} class="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
-                              <div class="flex items-center gap-2">
-                                <input 
-                                  type="checkbox" 
-                                  checked={selectedTags.includes(tag)} 
-                                  onChange={() => toggleFilter(tag, selectedTags, setSelectedTags)}
-                                  class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
-                                />
-                                <span class="truncate max-w-[120px]">{tag}</span>
-                              </div>
-                              <span class="text-slate-400 font-mono">{formatCount(tagCounts[tag])}</span>
-                            </label>
-                          ))}
-                        </>
-                      )}
-
-                      {filteredTagsList.length > 5 && (
-                        <button 
-                          onClick={() => setShowAllTags(!showAllTags)} 
-                          class="text-xs text-blue-600 hover:underline font-medium block pt-1"
-                        >
-                          {showAllTags ? 'See Less' : 'See More'}
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-
+                <FilterBlock label="Keywords / Tags" sectionKey="tags"
+                  list={filteredTagsList} counts={tagCounts}
+                  selected={selectedTags} setSelected={setSelectedTags}
+                  search={tagSearch} setSearch={setTagSearch}
+                  showAll={showAllTags} setShowAll={setShowAllTags} last />
               </div>
             </aside>
 
-            {/* Main Content Area */}
-            <main class="flex-1 p-6 overflow-y-auto">
-              <div class="flex justify-between items-center mb-4">
-                <h2 class="text-lg font-bold text-slate-800">
-                  {globalSearch.trim() !== "" ? `Search Results across all tabs (${filteredSamples.length})` : `${activeTab} (${filteredSamples.length})`}
+            {/* Main */}
+            <main className="flex-1 p-6 overflow-y-auto">
+              <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
+                <h2 className="text-lg font-bold text-slate-800">
+                  {globalSearch.trim() !== ""
+                    ? `Search Results across all tabs (${filteredSamples.length})`
+                    : `${activeTab} (${filteredSamples.length})`}
                 </h2>
+                {activeFilterCount > 0 && (
+                  <button onClick={clearAllFilters}
+                    className="text-xs text-blue-600 hover:underline font-medium">
+                    Clear filters ({activeFilterCount})
+                  </button>
+                )}
               </div>
 
               {loading ? (
-                <div class="flex justify-center items-center h-64">
-                  <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <div className="flex justify-center items-center h-64">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 </div>
               ) : filteredSamples.length === 0 ? (
-                <div class="bg-white rounded-lg border border-slate-200 p-8 text-center text-slate-500">
+                <div className="bg-white rounded-lg border border-slate-200 p-8 text-center text-slate-500">
                   No sample records found.
                 </div>
               ) : (
-                <div class="bg-white rounded-lg border border-slate-200 shadow-xs overflow-hidden">
-                  <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
-                          <th class="py-3 px-4">Sample ID</th>
-                          <th class="py-3 px-4">Sample Name</th>
-                          <th class="py-3 px-4">Requirement</th>
-                          <th class="py-3 px-4">Industry</th>
-                          <th class="py-3 px-4">Location</th>
-                          <th class="py-3 px-4">Tags</th>
-                          <th class="py-3 px-4">Sample Link</th>
-                        </tr>
-                      </thead>
-                      <tbody class="divide-y divide-slate-200">
-                        {filteredSamples.map((item) => (
-                          <tr key={item.id} class="hover:bg-slate-50/80 transition">
-                            <td class="py-3 px-4 font-mono text-slate-500">{item.sampleId}</td>
-                            <td class="py-3 px-4 font-medium text-slate-800">{item.sampleName}</td>
-                            <td class="py-3 px-4 text-slate-600 max-w-xs truncate">{item.clientRequirement}</td>
-                            <td class="py-3 px-4 text-slate-600">{item.industry}</td>
-                            <td class="py-3 px-4 text-slate-600">{item.location}</td>
-                            <td class="py-3 px-4 text-slate-600">{item.tags}</td>
-                            <td class="py-3 px-4">
-                              <a 
-                                href={item.sampleSheet} 
-                                target="_blank" 
-                                rel="noopener noreferrer" 
-                                class="text-blue-600 hover:underline inline-flex items-center gap-1 font-medium"
-                              >
-                                View Sheet ↗
-                              </a>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {filteredSamples.map(item => <SampleCard key={item.id} item={item} />)}
                 </div>
               )}
             </main>
