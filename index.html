@@ -131,32 +131,6 @@
         });
       };
 
-      // Helper function to extract location from name if column missing
-      const detectLocationFromName = (name, index) => {
-        if (!name) return 'United States';
-        const str = String(name);
-        const locations = ['USA', 'United States', 'UK', 'United Kingdom', 'Canada', 'Australia', 'Germany', 'France', 'India', 'Japan', 'Texas', 'California', 'Florida', 'New York'];
-        for (let loc of locations) {
-          if (str.toLowerCase().includes(loc.toLowerCase())) return loc;
-        }
-        const defaultLocs = ['United States', 'United Kingdom', 'Canada', 'Australia', 'Germany'];
-        return defaultLocs[index % defaultLocs.length];
-      };
-
-      // Helper function to extract industry based on tab or name
-      const detectIndustry = (tabName, sampleName, index) => {
-        const tabLower = tabName.toLowerCase();
-        if (tabLower.includes('doctor') || tabLower.includes('specialist')) return 'Healthcare / Medical';
-        if (tabLower.includes('exhibitor') || tabLower.includes('attendee')) return 'Events & Exhibitions';
-        if (tabLower.includes('e-commerce') || tabLower.includes('commerce')) return 'E-Commerce / Retail';
-        if (tabLower.includes('technology') || tabLower.includes('tech')) return 'Technology & Software';
-        if (tabLower.includes('funding')) return 'Finance & Investment';
-        if (tabLower.includes('government')) return 'Government & Public Sector';
-
-        const industries = ['Healthcare / Medical', 'Technology / IT', 'Business Services', 'Manufacturing', 'Finance & Banking'];
-        return industries[index % industries.length];
-      };
-
       const parseRows = (rawRows, tabName) => {
         if (!rawRows || rawRows.length === 0) {
           setSamples([]);
@@ -167,7 +141,7 @@
         let headerIndex = -1;
         let colMap = { id: -1, name: -1, url: -1, clientReq: -1, tags: -1, industry: -1, location: -1 };
 
-        // Dynamic Header Scan
+        // Dynamic Header Detection based ONLY on actual tab header text
         for (let i = 0; i < Math.min(5, rawRows.length); i++) {
           const rowStr = rawRows[i].map(c => String(c).toLowerCase()).join(' ');
           if (rowStr.includes('sample') || rowStr.includes('name') || rowStr.includes('location') || rowStr.includes('link') || rowStr.includes('url') || rowStr.includes('title')) {
@@ -175,7 +149,7 @@
             rawRows[i].forEach((cell, colIdx) => {
               const c = String(cell).toLowerCase().trim();
               if (c.includes('id') || c.includes('sr') || c.includes('no')) colMap.id = colIdx;
-              if (c.includes('name') || c.includes('title') || c.includes('sample')) {
+              if (c.includes('name') || c.includes('title') || c.includes('sample name') || c.includes('sample')) {
                 if (colMap.name === -1) colMap.name = colIdx;
               }
               if (c.includes('link') || c.includes('url') || c.includes('sheet')) colMap.url = colIdx;
@@ -195,7 +169,7 @@
           const getVal = (colIdx) => (colIdx >= 0 && row[colIdx]) ? String(row[colIdx]).trim() : '';
 
           const rawName = getVal(colMap.name) || (row[0] && !String(row[0]).includes('http') ? String(row[0]).trim() : `Sample Record ${idx + 1}`);
-          const sampleId = getVal(colMap.id) || `SMP-${String(idx + 1).padStart(4, '0')}`;
+          const sampleId = getVal(colMap.id) || rawName;
           
           let rawSheetUrl = getVal(colMap.url);
           if (!rawSheetUrl) {
@@ -203,27 +177,11 @@
             rawSheetUrl = cellWithUrl ? String(cellWithUrl) : '';
           }
 
-          const clientReq = getVal(colMap.clientReq) || '-';
-
-          // Dynamic Location resolution (if missing in tab)
-          let location = getVal(colMap.location);
-          if (!location || location === '-') {
-            location = detectLocationFromName(rawName, idx);
-          }
-
-          // Dynamic Industry resolution (if missing in tab)
-          let industry = getVal(colMap.industry);
-          if (!industry || industry === '-') {
-            industry = detectIndustry(tabName, rawName, idx);
-          }
-
-          // Dynamic Tags resolution
-          let tags = getVal(colMap.tags);
-          if (!tags || tags === '-') {
-            tags = rawName.split(' ').slice(0, 3).join(' ');
-          }
-
-          const projectStatus = idx % 3 === 0 ? 'Completed' : (idx % 3 === 1 ? 'In Progress' : 'Paused');
+          // ONLY take data if the actual column exists in that sheet tab
+          const location = getVal(colMap.location);
+          const industry = getVal(colMap.industry);
+          const tags = getVal(colMap.tags);
+          const clientReq = getVal(colMap.clientReq);
 
           return {
             id: `${tabName}-${idx}`,
@@ -231,10 +189,10 @@
             sampleName: rawName,
             sampleSheet: cleanUrl(rawSheetUrl),
             clientRequirement: clientReq,
-            tags,
-            industry,
-            location,
-            projectStatus
+            tags: tags,
+            industry: industry,
+            location: location,
+            projectStatus: 'Completed'
           };
         });
 
@@ -242,7 +200,7 @@
         setLoading(false);
       };
 
-      // Aggregated counts for sidebar filters
+      // Sidebar Filter aggregations (only includes non-empty real data)
       const locationCounts = useMemo(() => {
         const counts = {};
         samples.forEach(s => {
@@ -297,9 +255,9 @@
             (item.industry && item.industry.toLowerCase().includes(search)) ||
             (item.tags && item.tags.toLowerCase().includes(search));
 
-          const matchesLocation = selectedLocations.length === 0 || selectedLocations.includes(item.location);
-          const matchesIndustry = selectedIndustries.length === 0 || selectedIndustries.includes(item.industry);
-          const matchesTags = selectedTags.length === 0 || selectedTags.includes(item.tags);
+          const matchesLocation = selectedLocations.length === 0 || (item.location && selectedLocations.includes(item.location));
+          const matchesIndustry = selectedIndustries.length === 0 || (item.industry && selectedIndustries.includes(item.industry));
+          const matchesTags = selectedTags.length === 0 || (item.tags && selectedTags.includes(item.tags));
 
           return matchesGlobalSearch && matchesLocation && matchesIndustry && matchesTags;
         });
@@ -386,20 +344,24 @@
 
                   {openSections.location && (
                     <div class="space-y-2 mt-2">
-                      {(showAllLocations ? filteredLocations : filteredLocations.slice(0, 5)).map(loc => (
-                        <label key={loc} class="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
-                          <div class="flex items-center gap-2">
-                            <input 
-                              type="checkbox" 
-                              checked={selectedLocations.includes(loc)} 
-                              onChange={() => toggleFilter(loc, selectedLocations, setSelectedLocations)}
-                              class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
-                            />
-                            <span>{loc}</span>
-                          </div>
-                          <span class="text-slate-400 font-mono">{formatCount(locationCounts[loc])}</span>
-                        </label>
-                      ))}
+                      {filteredLocations.length === 0 ? (
+                        <p class="text-xs text-slate-400 italic">No locations in this tab</p>
+                      ) : (
+                        (showAllLocations ? filteredLocations : filteredLocations.slice(0, 5)).map(loc => (
+                          <label key={loc} class="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
+                            <div class="flex items-center gap-2">
+                              <input 
+                                type="checkbox" 
+                                checked={selectedLocations.includes(loc)} 
+                                onChange={() => toggleFilter(loc, selectedLocations, setSelectedLocations)}
+                                class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
+                              />
+                              <span class="truncate max-w-[120px]">{loc}</span>
+                            </div>
+                            <span class="text-slate-400 font-mono">{formatCount(locationCounts[loc])}</span>
+                          </label>
+                        ))
+                      )}
 
                       {filteredLocations.length > 5 && (
                         <button 
@@ -410,15 +372,17 @@
                         </button>
                       )}
 
-                      <div class="pt-2">
-                        <input
-                          type="text"
-                          placeholder="Search location"
-                          value={locationSearch}
-                          onChange={(e) => setLocationSearch(e.target.value)}
-                          class="w-full px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-blue-500"
-                        />
-                      </div>
+                      {filteredLocations.length > 0 && (
+                        <div class="pt-2">
+                          <input
+                            type="text"
+                            placeholder="Search location"
+                            value={locationSearch}
+                            onChange={(e) => setLocationSearch(e.target.value)}
+                            class="w-full px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -435,20 +399,24 @@
 
                   {openSections.industry && (
                     <div class="space-y-2 mt-2">
-                      {(showAllIndustries ? filteredIndustries : filteredIndustries.slice(0, 5)).map(ind => (
-                        <label key={ind} class="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
-                          <div class="flex items-center gap-2">
-                            <input 
-                              type="checkbox" 
-                              checked={selectedIndustries.includes(ind)} 
-                              onChange={() => toggleFilter(ind, selectedIndustries, setSelectedIndustries)}
-                              class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
-                            />
-                            <span class="truncate max-w-[120px]">{ind}</span>
-                          </div>
-                          <span class="text-slate-400 font-mono">{formatCount(industryCounts[ind])}</span>
-                        </label>
-                      ))}
+                      {filteredIndustries.length === 0 ? (
+                        <p class="text-xs text-slate-400 italic">No industries in this tab</p>
+                      ) : (
+                        (showAllIndustries ? filteredIndustries : filteredIndustries.slice(0, 5)).map(ind => (
+                          <label key={ind} class="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
+                            <div class="flex items-center gap-2">
+                              <input 
+                                type="checkbox" 
+                                checked={selectedIndustries.includes(ind)} 
+                                onChange={() => toggleFilter(ind, selectedIndustries, setSelectedIndustries)}
+                                class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
+                              />
+                              <span class="truncate max-w-[120px]">{ind}</span>
+                            </div>
+                            <span class="text-slate-400 font-mono">{formatCount(industryCounts[ind])}</span>
+                          </label>
+                        ))
+                      )}
 
                       {filteredIndustries.length > 5 && (
                         <button 
@@ -459,15 +427,17 @@
                         </button>
                       )}
 
-                      <div class="pt-2">
-                        <input
-                          type="text"
-                          placeholder="Search industry"
-                          value={industrySearch}
-                          onChange={(e) => setIndustrySearch(e.target.value)}
-                          class="w-full px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-blue-500"
-                        />
-                      </div>
+                      {filteredIndustries.length > 0 && (
+                        <div class="pt-2">
+                          <input
+                            type="text"
+                            placeholder="Search industry"
+                            value={industrySearch}
+                            onChange={(e) => setIndustrySearch(e.target.value)}
+                            class="w-full px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -484,20 +454,24 @@
 
                   {openSections.tags && (
                     <div class="space-y-2 mt-2">
-                      {(showAllTags ? filteredTagsList : filteredTagsList.slice(0, 5)).map(tag => (
-                        <label key={tag} class="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
-                          <div class="flex items-center gap-2">
-                            <input 
-                              type="checkbox" 
-                              checked={selectedTags.includes(tag)} 
-                              onChange={() => toggleFilter(tag, selectedTags, setSelectedTags)}
-                              class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
-                            />
-                            <span class="truncate max-w-[120px]">{tag}</span>
-                          </div>
-                          <span class="text-slate-400 font-mono">{formatCount(tagCounts[tag])}</span>
-                        </label>
-                      ))}
+                      {filteredTagsList.length === 0 ? (
+                        <p class="text-xs text-slate-400 italic">No tags in this tab</p>
+                      ) : (
+                        (showAllTags ? filteredTagsList : filteredTagsList.slice(0, 5)).map(tag => (
+                          <label key={tag} class="flex items-center justify-between text-xs text-slate-700 cursor-pointer hover:bg-slate-50 p-1 rounded">
+                            <div class="flex items-center gap-2">
+                              <input 
+                                type="checkbox" 
+                                checked={selectedTags.includes(tag)} 
+                                onChange={() => toggleFilter(tag, selectedTags, setSelectedTags)}
+                                class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
+                              />
+                              <span class="truncate max-w-[120px]">{tag}</span>
+                            </div>
+                            <span class="text-slate-400 font-mono">{formatCount(tagCounts[tag])}</span>
+                          </label>
+                        ))
+                      )}
 
                       {filteredTagsList.length > 5 && (
                         <button 
@@ -508,15 +482,17 @@
                         </button>
                       )}
 
-                      <div class="pt-2">
-                        <input
-                          type="text"
-                          placeholder="Search tags"
-                          value={tagSearch}
-                          onChange={(e) => setTagSearch(e.target.value)}
-                          class="w-full px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-blue-500"
-                        />
-                      </div>
+                      {filteredTagsList.length > 0 && (
+                        <div class="pt-2">
+                          <input
+                            type="text"
+                            placeholder="Search tags"
+                            value={tagSearch}
+                            onChange={(e) => setTagSearch(e.target.value)}
+                            class="w-full px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -548,35 +524,40 @@
                       class="bg-white rounded-xl border border-slate-200/90 p-4 shadow-sm hover:shadow-md transition relative flex flex-col justify-between"
                     >
                       <div>
-                        {/* Status Badge */}
-                        <div class="flex justify-between items-start mb-1">
+                        {/* Title & Badge */}
+                        <div class="flex justify-between items-start mb-2">
                           <h3 class="text-base font-bold text-slate-900 leading-tight">
                             {sample.sampleName}
                           </h3>
-                          <span class={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
-                            sample.projectStatus === 'Completed' ? 'bg-emerald-100 text-emerald-800' :
-                            sample.projectStatus === 'In Progress' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
-                          }`}>
-                            {sample.projectStatus}
+                          <span class="text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 shrink-0 ml-2">
+                            Completed
                           </span>
                         </div>
 
-                        {/* Minimal Structured Details */}
+                        {/* Clean Dynamic Detail Card Fields */}
                         <div class="space-y-1 my-3 text-xs">
                           <p class="text-slate-800"><span class="font-bold">Sample ID:</span> {sample.sampleId}</p>
-                          <p class="text-slate-800"><span class="font-bold">Location:</span> {sample.location}</p>
-                          <p class="text-slate-800"><span class="font-bold">Industry:</span> {sample.industry}</p>
                           
-                          <div class="flex items-center gap-1.5 pt-1">
-                            <span class="font-bold text-slate-800">Keywords/Tags:</span>
-                            <span class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-[11px] font-medium truncate max-w-[150px]">
-                              {sample.tags}
-                            </span>
-                          </div>
+                          {sample.location && (
+                            <p class="text-slate-800"><span class="font-bold">Location:</span> {sample.location}</p>
+                          )}
+                          
+                          {sample.industry && (
+                            <p class="text-slate-800"><span class="font-bold">Industry:</span> {sample.industry}</p>
+                          )}
+                          
+                          {sample.tags && (
+                            <div class="flex items-center gap-1.5 pt-1">
+                              <span class="font-bold text-slate-800">Keywords/Tags:</span>
+                              <span class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-[11px] font-medium truncate max-w-[150px]">
+                                {sample.tags}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
 
-                      {/* Google Sheet Direct Link Section */}
+                      {/* Google Sheet Link */}
                       <div class="flex items-center justify-between pt-3 border-t border-slate-100 mt-2">
                         <span class="text-xs text-slate-500 font-medium">Google Sheet Link:</span>
                         <a 
