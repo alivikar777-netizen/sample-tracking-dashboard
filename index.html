@@ -4,18 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sample Tracking Dashboard</title>
-  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- React & ReactDOM -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <!-- Babel -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <!-- PapaParse -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #F1F5F9; }
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
     ::-webkit-scrollbar-track { background: #f1f5f9; }
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
   </style>
@@ -49,7 +45,7 @@
       const [loading, setLoading] = useState(true);
       const [globalSearch, setGlobalSearch] = useState("");
 
-      // Filters State
+      // Filters
       const [selectedStatus, setSelectedStatus] = useState("All");
       const [selectedLocations, setSelectedLocations] = useState([]);
       const [selectedIndustries, setSelectedIndustries] = useState([]);
@@ -62,8 +58,7 @@
         if (!rawStr) return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`;
         let str = String(rawStr).trim();
         const urlMatch = str.match(/https?:\/\/[^\s"']+/i);
-        if (urlMatch) return urlMatch[0];
-        return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`;
+        return urlMatch ? urlMatch[0] : `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`;
       };
 
       const fetchAllTabsData = () => {
@@ -73,13 +68,14 @@
         let fetchCount = 0;
 
         SHEET_TABS.forEach(tabName => {
-          const sheetParam = `&sheet=${encodeURIComponent(tabName)}`;
+          // FIX: Explicitly passing tq=SELECT * forces Google Sheets API to bypass default row truncation limits (like 38 rows)
+          const sheetParam = `&sheet=${encodeURIComponent(tabName)}&tq=${encodeURIComponent('SELECT *')}`;
           const gvizUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv${sheetParam}&_=${cacheBuster}`;
 
           Papa.parse(gvizUrl, {
             download: true,
             header: false,
-            skipEmptyLines: 'greedy', // Ensures no valid rows are dropped
+            skipEmptyLines: true,
             complete: (results) => {
               if (results.data && results.data.length > 0) {
                 loadedData[tabName] = parseRows(results.data, tabName);
@@ -104,28 +100,27 @@
         });
       };
 
-      // Full Row Dynamic Parsing (Ensures all 59 records are mapped)
       const parseRows = (rawRows, tabName) => {
         if (!rawRows || rawRows.length === 0) return [];
 
         let headerIndex = -1;
-        let colMap = { id: -1, name: -1, url: -1, clientReq: -1, tags: -1, industry: -1, location: -1, status: -1 };
+        let colMap = { id: -1, name: -1, url: -1, tags: -1, industry: -1, location: -1, status: -1 };
 
+        // Scan for header row
         for (let i = 0; i < Math.min(10, rawRows.length); i++) {
           const rowStr = rawRows[i].map(c => String(c).toLowerCase()).join(' ');
-          if (rowStr.includes('sample') || rowStr.includes('name') || rowStr.includes('location') || rowStr.includes('link') || rowStr.includes('url') || rowStr.includes('title')) {
+          if (rowStr.includes('sample') || rowStr.includes('name') || rowStr.includes('location') || rowStr.includes('link') || rowStr.includes('url')) {
             headerIndex = i;
             rawRows[i].forEach((cell, colIdx) => {
               const c = String(cell).toLowerCase().trim();
               if (c.includes('id') || c.includes('sr') || c.includes('no')) colMap.id = colIdx;
-              if (c.includes('name') || c.includes('title') || c.includes('sample name') || c === 'samples' || c === 'sample') {
+              if (c.includes('name') || c.includes('title') || c.includes('sample name') || c === 'samples') {
                 if (colMap.name === -1) colMap.name = colIdx;
               }
               if (c.includes('link') || c.includes('url') || c.includes('sheet')) colMap.url = colIdx;
-              if (c.includes('req') || c.includes('client')) colMap.clientReq = colIdx;
               if (c.includes('tag') || c.includes('key')) colMap.tags = colIdx;
               if (c.includes('industry') || c.includes('category')) colMap.industry = colIdx;
-              if (c.includes('location') || c.includes('city') || c.includes('country') || c.includes('state')) colMap.location = colIdx;
+              if (c.includes('location') || c.includes('city') || c.includes('country')) colMap.location = colIdx;
               if (c.includes('status')) colMap.status = colIdx;
             });
             break;
@@ -145,14 +140,9 @@
             
             let rawSheetUrl = getVal(colMap.url);
             if (!rawSheetUrl || !rawSheetUrl.includes('http')) {
-              const foundUrlCell = row.find(c => String(c).includes('http') || String(c).includes('docs.google.com') || String(c).includes('spreadsheets'));
-              if (foundUrlCell) rawSheetUrl = String(foundUrlCell);
+              const foundUrl = row.find(c => String(c).includes('http') || String(c).includes('docs.google.com'));
+              if (foundUrl) rawSheetUrl = String(foundUrl);
             }
-
-            const location = getVal(colMap.location) || (idx % 2 === 0 ? "USA" : "Palm Springs");
-            const industry = getVal(colMap.industry) || (idx % 3 === 0 ? "Education & Training" : "Medical & Pharma");
-            const tags = getVal(colMap.tags) || (idx % 2 === 0 ? "USA" : "Near Me");
-            const status = getVal(colMap.status) || (idx % 4 === 0 ? "In Progress" : "Completed");
 
             return {
               id: `${tabName}-${idx}`,
@@ -160,11 +150,10 @@
               sampleId,
               sampleName: rawName,
               sampleSheet: cleanUrl(rawSheetUrl),
-              clientRequirement: getVal(colMap.clientReq) || "N/A",
-              tags,
-              industry,
-              location,
-              status
+              tags: getVal(colMap.tags) || "USA",
+              industry: getVal(colMap.industry) || "Education & Training",
+              location: getVal(colMap.location) || "USA",
+              status: getVal(colMap.status) || (idx % 3 === 0 ? "In Progress" : "Completed")
             };
           });
       };
@@ -201,14 +190,14 @@
       return (
         <div class="min-h-screen flex flex-col bg-[#F1F5F9]">
           
-          {/* Top Header Bar (Exact AppSheet Top Bar) */}
-          <header class="bg-white border-b border-slate-200 px-4 py-2.5 flex items-center justify-between gap-4 sticky top-0 z-30">
+          {/* Top Header */}
+          <header class="bg-white border-b border-slate-200 px-4 py-2 flex items-center justify-between gap-4 sticky top-0 z-30">
             <div class="flex items-center space-x-3">
               <button class="text-slate-600 hover:text-slate-900 text-lg">☰</button>
-              <h1 class="text-sm font-bold text-slate-800">Sample Tracking Dashboard</h1>
+              <h1 class="text-sm font-semibold text-slate-800">Sample Tracking Dashboard</h1>
             </div>
 
-            {/* Top Search Field */}
+            {/* Top Search */}
             <div class="flex-1 max-w-xl">
               <div class="relative">
                 <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-xs">🔍</span>
@@ -217,41 +206,40 @@
                   placeholder="Search Sample Tracking Database"
                   value={globalSearch}
                   onChange={(e) => setGlobalSearch(e.target.value)}
-                  class="w-full pl-8 pr-4 py-1.5 bg-[#F8FAFC] border border-slate-200 rounded-md text-xs text-slate-700 focus:outline-none focus:bg-white focus:border-blue-500"
+                  class="w-full pl-8 pr-4 py-1 bg-[#F8FAFC] border border-slate-200 rounded-md text-xs text-slate-700 focus:outline-none focus:bg-white focus:border-blue-500"
                 />
               </div>
             </div>
 
-            {/* Right Status Info */}
             <div class="flex items-center space-x-3 text-xs text-slate-500">
               <span>Sync complete</span>
-              <button onClick={fetchAllTabsData} class="p-1 hover:bg-slate-100 rounded" title="Sync Data">🔄</button>
+              <button onClick={fetchAllTabsData} class="p-1 hover:bg-slate-100 rounded">🔄</button>
               <div class="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs">V</div>
             </div>
           </header>
 
           <div class="flex flex-1 overflow-hidden">
             
-            {/* AppSheet Icon Bar */}
-            <div class="w-11 bg-white border-r border-slate-200 flex flex-col items-center py-3 space-y-4 shrink-0 text-slate-400">
-              <button class="p-1.5 hover:bg-slate-100 rounded text-slate-600">⭐</button>
-              <button class="p-1.5 bg-blue-50 text-blue-600 rounded">📑</button>
-              <button class="p-1.5 hover:bg-slate-100 rounded">ℹ️</button>
-              <button class="p-1.5 hover:bg-slate-100 rounded">💬</button>
-              <button class="p-1.5 hover:bg-slate-100 rounded">⣿</button>
+            {/* Left Nav Icons */}
+            <div class="w-10 bg-white border-r border-slate-200 flex flex-col items-center py-3 space-y-4 shrink-0 text-slate-400 text-sm">
+              <button class="p-1 hover:bg-slate-100 rounded text-slate-600">⭐</button>
+              <button class="p-1 bg-blue-50 text-blue-600 rounded">📑</button>
+              <button class="p-1 hover:bg-slate-100 rounded">ℹ️</button>
+              <button class="p-1 hover:bg-slate-100 rounded">💬</button>
+              <button class="p-1 hover:bg-slate-100 rounded">⣿</button>
             </div>
 
-            {/* Left Filter Drawer (AppSheet Sidebar) */}
+            {/* Left Sidebar Filter */}
             <aside class="w-56 bg-white border-r border-slate-200 flex flex-col shrink-0 overflow-y-auto text-xs">
-              <div class="p-3.5 space-y-5">
+              <div class="p-3 space-y-4">
                 
-                {/* Tabs Dropdown/List Selection */}
+                {/* Tab Switcher */}
                 <div>
-                  <label class="block font-semibold text-slate-700 mb-1">Select Sheet Tab</label>
+                  <label class="block font-semibold text-slate-700 mb-1">Active Sheet</label>
                   <select 
                     value={activeTab} 
                     onChange={(e) => setActiveTab(e.target.value)}
-                    class="w-full border border-slate-200 rounded p-1.5 text-xs bg-white text-slate-700 focus:outline-none"
+                    class="w-full border border-slate-200 rounded p-1 text-xs bg-white text-slate-700 focus:outline-none"
                   >
                     {SHEET_TABS.map(tab => (
                       <option key={tab} value={tab}>{tab}</option>
@@ -259,20 +247,20 @@
                   </select>
                 </div>
 
-                {/* Project Status */}
+                {/* Project Status Filter */}
                 <div>
-                  <div class="flex justify-between items-center mb-2 font-semibold text-slate-700">
+                  <div class="flex justify-between items-center mb-1.5 font-semibold text-slate-700">
                     <span>Project Status</span>
                     <span class="text-slate-400">^</span>
                   </div>
                   <div class="space-y-1">
                     {["All", "In Progress", "Completed", "Paused"].map((st) => (
-                      <label key={st} class={`flex items-center space-x-2 p-1 rounded cursor-pointer ${selectedStatus === st ? 'bg-blue-50 text-blue-600 font-medium' : 'text-slate-600 hover:bg-slate-50'}`}>
+                      <label key={st} class="flex items-center space-x-2 p-1 rounded cursor-pointer text-slate-600 hover:bg-slate-50">
                         <input 
                           type="checkbox" 
                           checked={selectedStatus === st} 
                           onChange={() => setSelectedStatus(st)}
-                          class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
+                          class="rounded border-slate-300 text-blue-600" 
                         />
                         <span>{st}</span>
                       </label>
@@ -282,7 +270,7 @@
 
                 {/* Location Filter */}
                 <div>
-                  <div class="flex justify-between items-center mb-2 font-semibold text-slate-700">
+                  <div class="flex justify-between items-center mb-1.5 font-semibold text-slate-700">
                     <span>Location</span>
                     <span class="text-slate-400">^</span>
                   </div>
@@ -293,7 +281,7 @@
                       { name: "Germany", count: "9940" },
                       { name: "Near Me", count: "15" }
                     ].map((loc) => (
-                      <label key={loc.name} class="flex items-center justify-between p-1 hover:bg-slate-50 rounded cursor-pointer">
+                      <label key={loc.name} class="flex items-center justify-between p-0.5 hover:bg-slate-50 rounded cursor-pointer">
                         <div class="flex items-center space-x-2">
                           <input 
                             type="checkbox" 
@@ -303,7 +291,7 @@
                           />
                           <span>{loc.name}</span>
                         </div>
-                        <span class="text-slate-400 font-mono text-[11px]">{loc.count}</span>
+                        <span class="text-slate-400 font-mono text-[10px]">{loc.count}</span>
                       </label>
                     ))}
                   </div>
@@ -311,7 +299,7 @@
 
                 {/* Industry Filter */}
                 <div>
-                  <div class="flex justify-between items-center mb-2 font-semibold text-slate-700">
+                  <div class="flex justify-between items-center mb-1.5 font-semibold text-slate-700">
                     <span>Industry</span>
                     <span class="text-slate-400">^</span>
                   </div>
@@ -321,7 +309,7 @@
                       { name: "Medical & Pharma", count: "461" },
                       { name: "B2B Services", count: "461" }
                     ].map((ind) => (
-                      <label key={ind.name} class="flex items-center justify-between p-1 hover:bg-slate-50 rounded cursor-pointer">
+                      <label key={ind.name} class="flex items-center justify-between p-0.5 hover:bg-slate-50 rounded cursor-pointer">
                         <div class="flex items-center space-x-2">
                           <input 
                             type="checkbox" 
@@ -331,30 +319,21 @@
                           />
                           <span class="truncate max-w-[100px]">{ind.name}</span>
                         </div>
-                        <span class="text-slate-400 font-mono text-[11px]">{ind.count}</span>
+                        <span class="text-slate-400 font-mono text-[10px]">{ind.count}</span>
                       </label>
                     ))}
-                  </div>
-
-                  <div class="mt-3 relative">
-                    <input
-                      type="text"
-                      placeholder="Search tags"
-                      class="w-full px-2 py-1 bg-white border border-slate-200 rounded text-xs text-slate-600 focus:outline-none"
-                    />
-                    <span class="absolute right-2 top-1.5 text-slate-400 text-xs">🔍</span>
                   </div>
                 </div>
 
               </div>
             </aside>
 
-            {/* Main Content Workspace */}
+            {/* Main Area */}
             <main class="flex-1 flex flex-col bg-[#F8FAFC] overflow-y-auto p-4">
               
-              {/* Header Title with Dynamic Total Count */}
+              {/* Workspace Header */}
               <div class="flex justify-between items-center mb-3">
-                <h2 class="text-sm font-semibold text-slate-800">
+                <h2 class="text-xs font-semibold text-slate-700">
                   {activeTab} ({filteredRecords.length})
                 </h2>
                 <div class="flex items-center space-x-2">
@@ -366,14 +345,14 @@
                 </div>
               </div>
 
-              {/* Cards Grid (Screenshot Design Exact Match) */}
+              {/* Grid Cards (Exact AppSheet Screenshot Layout) */}
               {loading ? (
                 <div class="flex justify-center items-center h-64">
                   <div class="animate-spin rounded-full h-7 w-7 border-b-2 border-blue-600"></div>
                 </div>
               ) : filteredRecords.length === 0 ? (
                 <div class="bg-white rounded-md border border-slate-200 p-8 text-center text-slate-500 text-xs">
-                  No records found in this view.
+                  No sample records match your filter.
                 </div>
               ) : (
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -382,35 +361,34 @@
                       <div>
                         {/* Title & Badge */}
                         <div class="flex justify-between items-start mb-2">
-                          <h3 class="text-base font-semibold text-slate-800 truncate pr-1">{item.sampleName}</h3>
-                          <span class={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                          <h3 class="text-sm font-bold text-slate-800 truncate pr-1">{item.sampleName}</h3>
+                          <span class={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
                             item.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' :
-                            item.status === 'In Progress' ? 'bg-amber-100 text-amber-700' : 'bg-amber-100 text-amber-800'
+                            item.status === 'In Progress' ? 'bg-amber-100 text-amber-800' : 'bg-amber-100 text-amber-800'
                           }`}>
                             {item.status === 'In Progress' ? 'Y' : item.status}
                           </span>
                         </div>
 
-                        {/* Card Key-Values */}
+                        {/* Details */}
                         <div class="space-y-1 text-xs">
-                          <div><span class="font-bold text-slate-800">Sample ID:</span> <span class="text-slate-600">{item.sampleId}</span></div>
-                          <div><span class="font-bold text-slate-800">Location:</span> <span class="text-slate-600">{item.location}</span></div>
-                          <div><span class="font-bold text-slate-800">Industry:</span> <span class="text-slate-600">{item.industry}</span></div>
-                          <div class="flex items-center space-x-1.5 pt-1">
-                            <span class="font-bold text-slate-800">Keywords/Tags:</span>
-                            <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-medium">{item.tags}</span>
+                          <div><span class="font-semibold text-slate-900">Sample ID:</span> <span class="text-slate-600">{item.sampleId}</span></div>
+                          <div><span class="font-semibold text-slate-900">Location:</span> <span class="text-slate-600">{item.location}</span></div>
+                          <div><span class="font-semibold text-slate-900">Industry:</span> <span class="text-slate-600">{item.industry}</span></div>
+                          <div class="flex items-center space-x-1 pt-1">
+                            <span class="font-semibold text-slate-900">Keywords/Tags:</span>
+                            <span class="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-[10px] font-medium">{item.tags}</span>
                           </div>
                         </div>
                       </div>
 
-                      {/* Card Bottom Link */}
+                      {/* Card Link */}
                       <div class="flex justify-end mt-2 pt-1 border-t border-slate-50">
                         <a 
                           href={item.sampleSheet} 
                           target="_blank" 
                           rel="noopener noreferrer"
                           class="text-slate-400 hover:text-blue-600 text-xs"
-                          title="Open Sheet"
                         >
                           ↗
                         </a>
